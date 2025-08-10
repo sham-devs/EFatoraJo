@@ -1,9 +1,0 @@
-C:\Users\basel\Documents\Development\.NET\EFatoraJo\ShamEFatoraJo\E-FatoraJo-SDK\bin\Release\netstandard2.0\E-FatoraJo.dll.config
-C:\Users\basel\Documents\Development\.NET\EFatoraJo\ShamEFatoraJo\E-FatoraJo-SDK\bin\Release\netstandard2.0\E-FatoraJo.deps.json
-C:\Users\basel\Documents\Development\.NET\EFatoraJo\ShamEFatoraJo\E-FatoraJo-SDK\bin\Release\netstandard2.0\E-FatoraJo.dll
-C:\Users\basel\Documents\Development\.NET\EFatoraJo\ShamEFatoraJo\E-FatoraJo-SDK\bin\Release\netstandard2.0\E-FatoraJo.pdb
-C:\Users\basel\Documents\Development\.NET\EFatoraJo\ShamEFatoraJo\E-FatoraJo-SDK\obj\Release\netstandard2.0\E-FatoraJo-SDK.csproj.AssemblyReference.cache
-C:\Users\basel\Documents\Development\.NET\EFatoraJo\ShamEFatoraJo\E-FatoraJo-SDK\obj\Release\netstandard2.0\E-FatoraJo-SDK.GeneratedMSBuildEditorConfig.editorconfig
-C:\Users\basel\Documents\Development\.NET\EFatoraJo\ShamEFatoraJo\E-FatoraJo-SDK\obj\Release\netstandard2.0\E-FatoraJo-SDK.csproj.CoreCompileInputs.cache
-C:\Users\basel\Documents\Development\.NET\EFatoraJo\ShamEFatoraJo\E-FatoraJo-SDK\obj\Release\netstandard2.0\E-FatoraJo.dll
-C:\Users\basel\Documents\Development\.NET\EFatoraJo\ShamEFatoraJo\E-FatoraJo-SDK\obj\Release\netstandard2.0\E-FatoraJo.pdb
