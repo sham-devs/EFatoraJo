@@ -1,0 +1,34 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
+  <metadata>
+    <id>ShamDevs.EFatoraJo.Sdk</id>
+    <version>1.0.0</version>
+    <authors>ShamDevs</authors>
+    <description>A high-performance .NET SDK designed for smooth integration with Jordan’s JoFatora e-invoicing system.
+			Built with clean architecture, fully async support, and simplified compliance with local tax regulations — making integration fast and hassle-free.</description>
+    <copyright>Copyright © 2025 Sham Software Consultancy</copyright>
+    <repository type="git" />
+    <dependencies>
+      <group targetFramework=".NETStandard2.0">
+        <dependency id="Microsoft.Bcl.AsyncInterfaces" version="10.0.0-preview.5.25277.114" exclude="Build,Analyzers" />
+        <dependency id="Microsoft.CSharp" version="4.7.0" exclude="Build,Analyzers" />
+        <dependency id="Newtonsoft.Json" version="13.0.3" exclude="Build,Analyzers" />
+        <dependency id="System.Buffers" version="4.6.1" exclude="Build,Analyzers" />
+        <dependency id="System.Data.DataSetExtensions" version="4.5.0" exclude="Build,Analyzers" />
+        <dependency id="System.Diagnostics.DiagnosticSource" version="10.0.0-preview.5.25277.114" exclude="Build,Analyzers" />
+        <dependency id="System.Formats.Asn1" version="10.0.0-preview.5.25277.114" exclude="Build,Analyzers" />
+        <dependency id="System.IO.Pipelines" version="10.0.0-preview.5.25277.114" exclude="Build,Analyzers" />
+        <dependency id="System.Memory" version="4.6.3" exclude="Build,Analyzers" />
+        <dependency id="System.Numerics.Vectors" version="4.6.1" exclude="Build,Analyzers" />
+        <dependency id="System.Runtime.CompilerServices.Unsafe" version="6.1.2" exclude="Build,Analyzers" />
+        <dependency id="System.Text.Encodings.Web" version="10.0.0-preview.5.25277.114" exclude="Build,Analyzers" />
+        <dependency id="System.Text.Json" version="10.0.0-preview.5.25277.114" exclude="Build,Analyzers" />
+        <dependency id="System.Threading.Tasks.Extensions" version="4.6.3" exclude="Build,Analyzers" />
+        <dependency id="UblSharp" version="1.1.1" exclude="Build,Analyzers" />
+      </group>
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="C:\Users\basel\Documents\Development\.NET\EFatoraJo\ShamEFatoraJo\ShamDevs.EFatoraJo.Sdk\bin\Debug\netstandard2.0\ShamDevs.EFatoraJo.Sdk.dll" target="lib\netstandard2.0\ShamDevs.EFatoraJo.Sdk.dll" />
+  </files>
+</package>
