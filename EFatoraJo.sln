@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.13.35913.81
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WindowsFormsApp1", "WindowsFormsApp1\WindowsFormsApp1.csproj", "{9A0FDDE4-A9BF-441C-84BF-33A206534F52}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShamDevs.EFatoraJo.Sdk", "ShamDevs.EFatoraJo.Sdk\ShamDevs.EFatoraJo.Sdk.csproj", "{7356958C-A6E3-3BC8-7CBE-6524F0E8E89F}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShamDevs.EFatoraJo.Tests", "ShamDevs.EFatoraJo.Tests\ShamDevs.EFatoraJo.Tests.csproj", "{E16A5F48-5A0B-9E65-3CF7-082207C7B42B}"
@@ -21,18 +19,6 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{9A0FDDE4-A9BF-441C-84BF-33A206534F52}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{9A0FDDE4-A9BF-441C-84BF-33A206534F52}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{9A0FDDE4-A9BF-441C-84BF-33A206534F52}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{9A0FDDE4-A9BF-441C-84BF-33A206534F52}.Debug|x64.Build.0 = Debug|Any CPU
-		{9A0FDDE4-A9BF-441C-84BF-33A206534F52}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{9A0FDDE4-A9BF-441C-84BF-33A206534F52}.Debug|x86.Build.0 = Debug|Any CPU
-		{9A0FDDE4-A9BF-441C-84BF-33A206534F52}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{9A0FDDE4-A9BF-441C-84BF-33A206534F52}.Release|Any CPU.Build.0 = Release|Any CPU
-		{9A0FDDE4-A9BF-441C-84BF-33A206534F52}.Release|x64.ActiveCfg = Release|Any CPU
-		{9A0FDDE4-A9BF-441C-84BF-33A206534F52}.Release|x64.Build.0 = Release|Any CPU
-		{9A0FDDE4-A9BF-441C-84BF-33A206534F52}.Release|x86.ActiveCfg = Release|Any CPU
-		{9A0FDDE4-A9BF-441C-84BF-33A206534F52}.Release|x86.Build.0 = Release|Any CPU
 		{7356958C-A6E3-3BC8-7CBE-6524F0E8E89F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{7356958C-A6E3-3BC8-7CBE-6524F0E8E89F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7356958C-A6E3-3BC8-7CBE-6524F0E8E89F}.Debug|x64.ActiveCfg = Debug|Any CPU

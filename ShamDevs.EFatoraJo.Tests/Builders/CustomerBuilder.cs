@@ -1,12 +1,13 @@
-﻿using ShamDevs.EFatoraJo.Models;
+﻿using ShamDevs.EFatoraJo.Enums;
+using ShamDevs.EFatoraJo.Models;
 
 namespace ShamDevs.EFatoraJo.Tests.Builders
 {
     public class CustomerBuilder
     {
         private string _name = "Test Customer";
-        private string _identificationNumber = "CUST-001";
-        private string _identificationType = "NationalID";
+        private string _identificationNumber = "CUSTOMER-001";
+        private IdentificationType? _identificationType = IdentificationType.NIN;
         private string _postalCode = "11110";
         private string _phoneNumber = "+962790000000";
 
@@ -22,7 +23,7 @@ namespace ShamDevs.EFatoraJo.Tests.Builders
             return this;
         }
 
-        public CustomerBuilder WithIdentificationType(string type)
+        public CustomerBuilder WithIdentificationType(IdentificationType type)
         {
             _identificationType = type;
             return this;

@@ -9,7 +9,8 @@ namespace ShamDevs.EFatoraJo.Utilities
     public class RandomInvoiceGenerator
     {
         private static readonly Random random = new Random();
-        private static readonly string[] identificationTypes = { "VAT", "ID", "Passport", "Business Registration" };
+        private static readonly IdentificationType[] identificationTypes =
+            { IdentificationType.NIN, IdentificationType.PN, IdentificationType.TN };
         private static readonly string[] itemDescriptions = {
             "Laptop", "Monitor", "Keyboard", "Mouse", "Desk",
             "Chair", "Printer", "Software License", "Webcam",
@@ -28,9 +29,9 @@ namespace ShamDevs.EFatoraJo.Utilities
             var invoiceDate = DateTime.Now.AddDays(-random.Next(0, 30)).ToString("yyyy-MM-dd");
             var supplier = supplierInfo ?? GenerateRandomSupplier();
             var customer = GenerateRandomCustomer();
-            var currencyCode = currency ?? CurrencyCode.JOD; // Get the currency or default to JOD
+            var currencyCode = currency ?? CurrencyCode.JOD;
             var type = invoiceTpe ?? (InvoiceType)random.Next(0, 3);
-            var invoiceDetails = GenerateRandomInvoiceDetails(random.Next(2, 6), currencyCode, type); // Pass currency here
+            var invoiceDetails = GenerateRandomInvoiceDetails(random.Next(2, 6), currencyCode, type);
             var invoiceTotals = new InvoiceTotals();
 
             var invoice = new Invoice(
@@ -99,12 +100,12 @@ namespace ShamDevs.EFatoraJo.Utilities
             {
                 var taxCategory = kind switch
                 {
-                    InvoiceType.Income => TaxCategoryCode.Z,    // force zero tax
+                    InvoiceType.Income => TaxCategoryCode.Z,
                     InvoiceType.SpecialSales => random.Next(0, 3) switch
                     {
-                        0 => TaxCategoryCode.S,   // 16 %
-                        1 => TaxCategoryCode.S8,  // 8 %
-                        _ => TaxCategoryCode.S5   // 5 %
+                        0 => TaxCategoryCode.S,
+                        1 => TaxCategoryCode.S8,
+                        _ => TaxCategoryCode.S5
                     },
                     _ => taxCats[random.Next(taxCats.Length)]
                 };
@@ -146,23 +147,18 @@ namespace ShamDevs.EFatoraJo.Utilities
 
         private static decimal GetRealisticUnitPrice(CurrencyCode currency)
         {
-            // Base prices in JOD (3 decimal places)
             decimal[] pricePoints = {
                 49.999m, 99.999m, 149.999m, 199.999m, 249.999m,
                 299.999m, 349.999m, 399.999m, 449.999m, 499.999m,
                 59.999m, 79.999m, 119.999m, 159.999m, 179.999m
             };
 
-            // Get a random base price
             decimal basePrice = pricePoints[random.Next(pricePoints.Length)];
 
-            // Convert to target currency if needed (simplified conversion for demo)
-            // In real implementation, you might want to use actual exchange rates
             decimal convertedPrice = currency == CurrencyCode.JOD
                 ? basePrice
-                : basePrice * (currency == CurrencyCode.USD ? 1.41m : 1.5m); // Simplified conversion
+                : basePrice * (currency == CurrencyCode.USD ? 1.41m : 1.5m);
 
-            // Round to the correct precision for the currency
             return CurrencyHelper.Round(convertedPrice, currency);
         }
 

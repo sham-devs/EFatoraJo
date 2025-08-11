@@ -3,7 +3,7 @@ using ShamDevs.EFatoraJo.Models;
 using ShamDevs.EFatoraJo.Utilities;
 using System;
 using System.Collections.Generic;
-using System.Linq; // Required for LINQ operations
+using System.Linq;
 using UblSharp.CommonAggregateComponents;
 using UblSharp.UnqualifiedDataTypes;
 
@@ -95,7 +95,7 @@ namespace ShamDevs.EFatoraJo.Services
                     {
                         Country = new CountryType
                         {
-                            IdentificationCode = new CodeType { Value = "JO" } // Country code for Jordan
+                            IdentificationCode = new CodeType { Value = "JO" }
                         }
                     },
                     PartyTaxScheme = new List<PartyTaxSchemeType>
@@ -130,7 +130,7 @@ namespace ShamDevs.EFatoraJo.Services
                     {
                         ID = new IdentifierType
                         {
-                            schemeID = customer.IdentificationType,
+                            schemeID = customer.IdentificationType?.GetStringValue(),
                             Value = customer.IdentificationNumber
                         }
                     }
@@ -138,10 +138,10 @@ namespace ShamDevs.EFatoraJo.Services
                 PostalAddress = new AddressType
                 {
                     PostalZone = new TextType { Value = customer.PostalCode },
-                    CountrySubentityCode = new CodeType { Value = "JO-AM" },
+                    CountrySubentityCode = new CodeType { Value = customer.City?.GetStringValue() },
                     Country = new CountryType
                     {
-                        IdentificationCode = new CodeType { Value = "JO" } // Country code for Jordan
+                        IdentificationCode = new CodeType { Value = "JO" }
                     }
                 },
                 PartyTaxScheme = new List<PartyTaxSchemeType>
@@ -200,7 +200,7 @@ namespace ShamDevs.EFatoraJo.Services
                                               InvoiceType invoiceType,
                                               CurrencyCode currency)
         {
-            // Discount block
+            // Allowance / discount block
             ublInvoice.AllowanceCharge = new List<AllowanceChargeType>
             {
                 new AllowanceChargeType
@@ -212,13 +212,13 @@ namespace ShamDevs.EFatoraJo.Services
                     },
                     Amount = new AmountType
                     {
-                        currencyID = "JO",
-                        Value = FormatMonetaryValue(totals.TotalDiscountAmount,currency)
+                        currencyID = currency.GetStringValue(),
+                        Value = CurrencyHelper.Round(totals.TotalDiscountAmount, currency)
                     }
                 }
             };
 
-            /* VAT / Special taxes */
+            // VAT / Special taxes
             var taxTotals = new List<TaxTotalType>();
 
             if (HasVat(invoiceType))
@@ -227,8 +227,8 @@ namespace ShamDevs.EFatoraJo.Services
                 {
                     TaxAmount = new AmountType
                     {
-                        currencyID = "JO",
-                        Value = FormatMonetaryValue(totals.TotalVATAmount, currency)
+                        currencyID = currency.GetStringValue(),
+                        Value = CurrencyHelper.Round(totals.TotalVATAmount, currency)
                     }
                 });
             }
@@ -239,36 +239,36 @@ namespace ShamDevs.EFatoraJo.Services
                 {
                     TaxAmount = new AmountType
                     {
-                        currencyID = "JO",
-                        Value = FormatMonetaryValue(totals.TotalSpecialTaxAmount, currency)
+                        currencyID = currency.GetStringValue(),
+                        Value = CurrencyHelper.Round(totals.TotalSpecialTaxAmount, currency)
                     }
                 });
             }
 
             ublInvoice.TaxTotal = taxTotals;
 
-            /* Monetary totals */
+            // Monetary totals
             ublInvoice.LegalMonetaryTotal = new MonetaryTotalType
             {
                 TaxExclusiveAmount = new AmountType
                 {
-                    currencyID = "JO",
-                    Value = FormatMonetaryValue(totals.TotalBeforeDiscount, currency)
+                    currencyID = currency.GetStringValue(),
+                    Value = CurrencyHelper.Round(totals.TotalBeforeDiscount, currency)
                 },
                 TaxInclusiveAmount = new AmountType
                 {
-                    currencyID = "JO",
-                    Value = FormatMonetaryValue(totals.TotalInvoiceAmount, currency)
+                    currencyID = currency.GetStringValue(),
+                    Value = CurrencyHelper.Round(totals.TotalInvoiceAmount, currency)
                 },
                 AllowanceTotalAmount = new AmountType
                 {
-                    currencyID = "JO",
-                    Value = FormatMonetaryValue(totals.TotalDiscountAmount, currency)
+                    currencyID = currency.GetStringValue(),
+                    Value = CurrencyHelper.Round(totals.TotalDiscountAmount, currency)
                 },
                 PayableAmount = new AmountType
                 {
-                    currencyID = "JO",
-                    Value = FormatMonetaryValue(totals.TotalInvoiceAmount, currency)
+                    currencyID = currency.GetStringValue(),
+                    Value = CurrencyHelper.Round(totals.TotalInvoiceAmount, currency)
                 }
             };
         }
@@ -298,7 +298,7 @@ namespace ShamDevs.EFatoraJo.Services
 
             var taxTotals = new List<TaxTotalType>();
 
-            /* VAT */
+            // VAT
             if (HasVat(invoiceType))
             {
                 taxTotals.Add(new TaxTotalType
@@ -316,7 +316,7 @@ namespace ShamDevs.EFatoraJo.Services
                 });
             }
 
-            /* Special Tax */
+            // Special Tax
             if (HasSpecialTax(invoiceType) && detail.SpecialTaxAmount.HasValue)
             {
                 taxTotals.Add(new TaxTotalType
@@ -337,20 +337,6 @@ namespace ShamDevs.EFatoraJo.Services
             return line;
         }
 
-
-        private static InvoiceLineType CreateInvoiceLine(InvoiceDetail detail, CurrencyCode currency)
-        {
-            return new InvoiceLineType
-            {
-                ID = new IdentifierType { Value = detail.ID },
-                InvoicedQuantity = CreateQuantity(detail.Quantity),
-                LineExtensionAmount = CreateAmount(detail.TotalBeforeTax, currency),
-                TaxTotal = CreateTaxTotal(detail, currency),
-                Item = CreateItem(detail.Description),
-                Price = CreatePrice(detail, currency)
-            };
-        }
-
         private static QuantityType CreateQuantity(decimal quantity)
         {
             return new QuantityType
@@ -360,84 +346,38 @@ namespace ShamDevs.EFatoraJo.Services
             };
         }
 
-        private static AmountType CreateAmount(decimal value, CurrencyCode currency, string currencyID = "JO")
+        private static AmountType CreateAmount(decimal value, CurrencyCode currency)
         {
             return new AmountType
             {
-                currencyID = currencyID,
-                Value = FormatMonetaryValue(value, currency)
-            };
-        }
-
-        private static List<TaxTotalType> CreateTaxTotal(InvoiceDetail detail, CurrencyCode currency)
-        {
-            return new List<TaxTotalType>
-            {
-                new TaxTotalType
-                {
-                    TaxAmount = CreateAmount(detail.TaxAmount,currency),
-                    RoundingAmount = CreateAmount(detail.TotalIncludingTax, currency),
-                    TaxSubtotal = CreateTaxSubtotal(detail, currency)
-                }
-            };
-        }
-
-        private static List<TaxSubtotalType> CreateTaxSubtotal(InvoiceDetail detail, CurrencyCode currency)
-        {
-            return new List<TaxSubtotalType>
-            {
-                new TaxSubtotalType
-                {
-                    TaxAmount = CreateAmount(detail.TaxAmount, currency),
-                    TaxCategory = CreateTaxCategory(detail.TaxCategory)
-                }
+                currencyID = currency.GetStringValue(),
+                Value = CurrencyHelper.Round(value, currency)
             };
         }
 
         private static TaxCategoryType CreateTaxCategory(TaxCategoryCode taxCategory)
         {
-            string code;
-
-            switch (taxCategory)
-            {
-                case TaxCategoryCode.S:
-                case TaxCategoryCode.S1:
-                case TaxCategoryCode.S2:
-                case TaxCategoryCode.S3:
-                case TaxCategoryCode.S4:
-                case TaxCategoryCode.S5:
-                case TaxCategoryCode.S7:
-                case TaxCategoryCode.S8:
-                case TaxCategoryCode.S10:
-                    code = "S";
-                    break;
-
-                case TaxCategoryCode.O:
-                    code = "O";
-                    break;
-
-                case TaxCategoryCode.Z:
-                    code = "Z";
-                    break;
-
-                default:
-                    code = "O";
-                    break;
-            }
-
             return new TaxCategoryType
             {
                 ID = new IdentifierType
                 {
                     schemeAgencyID = "6",
                     schemeID = "UN/ECE 5305",
-                    Value = code
+                    Value = taxCategory.GetTaxCategoryCode()
                 },
                 Percent = new PercentType
                 {
                     Value = taxCategory.GetTaxPercent()
                 },
-                TaxScheme = CreateTaxScheme()
+                TaxScheme = new TaxSchemeType
+                {
+                    ID = new IdentifierType
+                    {
+                        schemeAgencyID = "6",
+                        schemeID = "UN/ECE 5153",
+                        Value = "VAT"
+                    }
+                }
             };
         }
 
@@ -460,19 +400,6 @@ namespace ShamDevs.EFatoraJo.Services
                         schemeID = "UN/ECE 5153",
                         Value = "ST"
                     }
-                }
-            };
-        }
-
-        private static TaxSchemeType CreateTaxScheme()
-        {
-            return new TaxSchemeType
-            {
-                ID = new IdentifierType
-                {
-                    schemeAgencyID = "6",
-                    schemeID = "UN/ECE 5153",
-                    Value = "VAT"
                 }
             };
         }
@@ -508,12 +435,6 @@ namespace ShamDevs.EFatoraJo.Services
                     Amount = CreateAmount(discountAmount ?? 0.00m, currency)
                 }
             };
-        }
-
-        // Helper method to format monetary values as #.00
-        private static decimal FormatMonetaryValue(decimal value, CurrencyCode currency)
-        {
-            return CurrencyHelper.Round(value, currency);
         }
     }
 }

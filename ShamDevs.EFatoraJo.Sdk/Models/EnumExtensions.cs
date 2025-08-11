@@ -32,5 +32,31 @@ namespace ShamDevs.EFatoraJo.Models
                 _ => 0 // O, Z
             };
         }
+
+        public static string GetTaxCategoryCode(this TaxCategoryCode category)
+        {
+            switch (category)
+            {
+                case TaxCategoryCode.S:
+                case TaxCategoryCode.S1:
+                case TaxCategoryCode.S2:
+                case TaxCategoryCode.S3:
+                case TaxCategoryCode.S4:
+                case TaxCategoryCode.S5:
+                case TaxCategoryCode.S7:
+                case TaxCategoryCode.S8:
+                case TaxCategoryCode.S10:
+                    return "S";
+
+                case TaxCategoryCode.O:
+                    return "O";
+
+                case TaxCategoryCode.Z:
+                    return "Z";
+
+                default:
+                    return "O"; // Fallback
+            }
+        }
     }
 }

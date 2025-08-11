@@ -1,4 +1,6 @@
-﻿namespace ShamDevs.EFatoraJo.Models
+﻿using ShamDevs.EFatoraJo.Enums;
+
+namespace ShamDevs.EFatoraJo.Models
 {
     public class Customer
     {
@@ -7,10 +9,11 @@
             Name = name;
         }
         public string? IdentificationNumber { get; set; }
-        public string? IdentificationType { get; set; }
+        public IdentificationType? IdentificationType { get; set; }
         public string? PostalCode { get; set; }
         public string Name { get; set; }
         public string? PhoneNumber { get; set; }
+        public CountrySubentityCode? City { get; set; }
 
     }
 }

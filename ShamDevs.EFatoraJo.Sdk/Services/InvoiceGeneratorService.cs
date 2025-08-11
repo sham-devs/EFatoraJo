@@ -15,6 +15,7 @@ namespace ShamDevs.EFatoraJo.Services
 
         /*  ----------  helper to decide whether an invoice type should contain Special tax  ----------  */
         private static bool HasSpecialTax(InvoiceType type) => type == InvoiceType.SpecialSales;
+
         // Generate the full UBL 2.1 Invoice
         public static UblSharp.InvoiceType GenerateUBL21(Invoice invoice)
         {
@@ -24,8 +25,8 @@ namespace ShamDevs.EFatoraJo.Services
             AddSupplierParty(ublInvoice, invoice.Supplier);
             AddCustomerParty(ublInvoice, invoice.Customer);
             AddSellerSupplierParty(ublInvoice, invoice.Supplier);
-            AddMonetaryTotals(ublInvoice, invoice.InvoiceTotals, invoice.Type);
-            AddInvoiceLines(ublInvoice, invoice.InvoiceDetails, invoice.Type);
+            AddMonetaryTotals(ublInvoice, invoice.InvoiceTotals, invoice.Type, invoice.Currency);
+            AddInvoiceLines(ublInvoice, invoice.InvoiceDetails, invoice.Type, invoice.Currency);
 
             return ublInvoice;
         }
@@ -94,7 +95,7 @@ namespace ShamDevs.EFatoraJo.Services
                     {
                         ID = new IdentifierType
                         {
-                            schemeID = customer.IdentificationType,
+                            schemeID = customer.IdentificationType?.GetStringValue(),
                             Value = customer.IdentificationNumber
                         }
                     }
@@ -102,7 +103,7 @@ namespace ShamDevs.EFatoraJo.Services
                 PostalAddress = new AddressType
                 {
                     PostalZone = new TextType { Value = customer.PostalCode },
-                    CountrySubentityCode = new CodeType { Value = "JO-AM" },
+                    CountrySubentityCode = new CodeType { Value = customer.City?.GetStringValue() },
                     Country = new CountryType
                     {
                         IdentificationCode = new CodeType { Value = "JO" } // Country code for Jordan
@@ -161,9 +162,10 @@ namespace ShamDevs.EFatoraJo.Services
 
         private static void AddMonetaryTotals(UblSharp.InvoiceType ublInvoice,
                                                InvoiceTotals totals,
-                                               InvoiceType invoiceType)
+                                               InvoiceType invoiceType,
+                                               CurrencyCode currency)
         {
-            // Allowance / discount block (unchanged)
+            // Allowance / discount block
             ublInvoice.AllowanceCharge = new List<AllowanceChargeType>
             {
                 new AllowanceChargeType
@@ -175,7 +177,7 @@ namespace ShamDevs.EFatoraJo.Services
                     },
                     Amount = new AmountType
                     {
-                        currencyID = "JO",
+                        currencyID = currency.GetStringValue(),
                         Value = FormatMonetaryValue(totals.TotalDiscountAmount)
                     }
                 }
@@ -190,7 +192,7 @@ namespace ShamDevs.EFatoraJo.Services
                 {
                     TaxAmount = new AmountType
                     {
-                        currencyID = "JO",
+                        currencyID = currency.GetStringValue(),
                         Value = FormatMonetaryValue(totals.TotalVATAmount)
                     }
                 });
@@ -202,7 +204,7 @@ namespace ShamDevs.EFatoraJo.Services
                 {
                     TaxAmount = new AmountType
                     {
-                        currencyID = "JO",
+                        currencyID = currency.GetStringValue(),
                         Value = FormatMonetaryValue(totals.TotalSpecialTaxAmount)
                     }
                 });
@@ -210,27 +212,27 @@ namespace ShamDevs.EFatoraJo.Services
 
             ublInvoice.TaxTotal = taxTotals;
 
-            /*  Monetary totals – same as before  */
+            /*  Monetary totals */
             ublInvoice.LegalMonetaryTotal = new MonetaryTotalType
             {
                 TaxExclusiveAmount = new AmountType
                 {
-                    currencyID = "JO",
+                    currencyID = currency.GetStringValue(),
                     Value = FormatMonetaryValue(totals.TotalBeforeDiscount)
                 },
                 TaxInclusiveAmount = new AmountType
                 {
-                    currencyID = "JO",
+                    currencyID = currency.GetStringValue(),
                     Value = FormatMonetaryValue(totals.TotalInvoiceAmount)
                 },
                 AllowanceTotalAmount = new AmountType
                 {
-                    currencyID = "JO",
+                    currencyID = currency.GetStringValue(),
                     Value = FormatMonetaryValue(totals.TotalDiscountAmount)
                 },
                 PayableAmount = new AmountType
                 {
-                    currencyID = "JO",
+                    currencyID = currency.GetStringValue(),
                     Value = FormatMonetaryValue(totals.TotalInvoiceAmount)
                 }
             };
@@ -238,22 +240,23 @@ namespace ShamDevs.EFatoraJo.Services
 
         private static void AddInvoiceLines(UblSharp.InvoiceType ublInvoice,
                                             List<InvoiceDetail> details,
-                                            InvoiceType invoiceType)
+                                            InvoiceType invoiceType,
+                                            CurrencyCode currency)
         {
             ublInvoice.InvoiceLine = details
-                .Select(d => CreateInvoiceLine(d, invoiceType))
+                .Select(d => CreateInvoiceLine(d, invoiceType, currency))
                 .ToList();
         }
 
-        private static InvoiceLineType CreateInvoiceLine(InvoiceDetail detail, InvoiceType invoiceType)
+        private static InvoiceLineType CreateInvoiceLine(InvoiceDetail detail, InvoiceType invoiceType, CurrencyCode currency)
         {
             var line = new InvoiceLineType
             {
                 ID = new IdentifierType { Value = detail.ID },
                 InvoicedQuantity = CreateQuantity(detail.Quantity),
-                LineExtensionAmount = CreateAmount(detail.TotalBeforeTax),
+                LineExtensionAmount = CreateAmount(detail.TotalBeforeTax, currency),
                 Item = CreateItem(detail.Description),
-                Price = CreatePrice(detail)
+                Price = CreatePrice(detail, currency)
             };
 
             var taxTotals = new List<TaxTotalType>();
@@ -263,16 +266,16 @@ namespace ShamDevs.EFatoraJo.Services
             {
                 taxTotals.Add(new TaxTotalType
                 {
-                    TaxAmount = CreateAmount(detail.TaxAmount),
-                    RoundingAmount = CreateAmount(detail.TotalIncludingTax), // Added this line
+                    TaxAmount = CreateAmount(detail.TaxAmount, currency),
+                    RoundingAmount = CreateAmount(detail.TotalIncludingTax, currency),
                     TaxSubtotal = new List<TaxSubtotalType>
-            {
-                new TaxSubtotalType
-                {
-                    TaxAmount = CreateAmount(detail.TaxAmount),
-                    TaxCategory = CreateTaxCategory(detail.TaxCategory)
-                }
-            }
+                    {
+                        new TaxSubtotalType
+                        {
+                            TaxAmount = CreateAmount(detail.TaxAmount, currency),
+                            TaxCategory = CreateTaxCategory(detail.TaxCategory)
+                        }
+                    }
                 });
             }
 
@@ -281,15 +284,15 @@ namespace ShamDevs.EFatoraJo.Services
             {
                 taxTotals.Add(new TaxTotalType
                 {
-                    TaxAmount = CreateAmount(detail.SpecialTaxAmount.Value),
+                    TaxAmount = CreateAmount(detail.SpecialTaxAmount.Value, currency),
                     TaxSubtotal = new List<TaxSubtotalType>
-            {
-                new TaxSubtotalType
-                {
-                    TaxAmount = CreateAmount(detail.SpecialTaxAmount.Value),
-                    TaxCategory = CreateSpecialTaxCategory()
-                }
-            }
+                    {
+                        new TaxSubtotalType
+                        {
+                            TaxAmount = CreateAmount(detail.SpecialTaxAmount.Value, currency),
+                            TaxCategory = CreateSpecialTaxCategory()
+                        }
+                    }
                 });
             }
 
@@ -297,45 +300,16 @@ namespace ShamDevs.EFatoraJo.Services
             return line;
         }
 
-
-        /*  ----------  helper to build the VAT category (unchanged)  ----------  */
+        /*  ----------  helper to build the VAT category  ----------  */
         private static TaxCategoryType CreateTaxCategory(TaxCategoryCode taxCategory)
         {
-            string code;
-            switch (taxCategory)
-            {
-                case TaxCategoryCode.S:
-                case TaxCategoryCode.S1:
-                case TaxCategoryCode.S2:
-                case TaxCategoryCode.S3:
-                case TaxCategoryCode.S4:
-                case TaxCategoryCode.S5:
-                case TaxCategoryCode.S7:
-                case TaxCategoryCode.S8:
-                case TaxCategoryCode.S10:
-                    code = "S";
-                    break;
-
-                case TaxCategoryCode.O:
-                    code = "O";
-                    break;
-
-                case TaxCategoryCode.Z:
-                    code = "Z";
-                    break;
-
-                default:
-                    code = "O";
-                    break;
-            }
-
             return new TaxCategoryType
             {
                 ID = new IdentifierType
                 {
                     schemeAgencyID = "6",
                     schemeID = "UN/ECE 5305",
-                    Value = code
+                    Value = taxCategory.GetTaxCategoryCode()
                 },
                 Percent = new PercentType { Value = taxCategory.GetTaxPercent() },
                 TaxScheme = new TaxSchemeType
@@ -359,7 +333,7 @@ namespace ShamDevs.EFatoraJo.Services
                 {
                     schemeAgencyID = "6",
                     schemeID = "UN/ECE 5305",
-                    Value = "S"          // Jordan spec uses “S” for special tax
+                    Value = "S"          // Jordan spec uses "S" for special tax
                 },
                 Percent = new PercentType { Value = 0m },   // fixed amount
                 TaxScheme = new TaxSchemeType
@@ -379,9 +353,9 @@ namespace ShamDevs.EFatoraJo.Services
             return new QuantityType { unitCode = "PCE", Value = quantity };
         }
 
-        private static AmountType CreateAmount(decimal value, string currencyID = "JO")
+        private static AmountType CreateAmount(decimal value, CurrencyCode currency)
         {
-            return new AmountType { currencyID = currencyID, Value = FormatMonetaryValue(value) };
+            return new AmountType { currencyID = currency.GetStringValue(), Value = FormatMonetaryValue(value) };
         }
 
         private static ItemType CreateItem(string description)
@@ -389,16 +363,16 @@ namespace ShamDevs.EFatoraJo.Services
             return new ItemType { Name = new NameType { Value = description } };
         }
 
-        private static PriceType CreatePrice(InvoiceDetail detail)
+        private static PriceType CreatePrice(InvoiceDetail detail, CurrencyCode currency)
         {
             return new PriceType
             {
-                PriceAmount = CreateAmount(detail.UnitPriceBeforeTax),
-                AllowanceCharge = CreateAllowanceCharge(detail.DiscountAmount)
+                PriceAmount = CreateAmount(detail.UnitPriceBeforeTax, currency),
+                AllowanceCharge = CreateAllowanceCharge(detail.DiscountAmount, currency)
             };
         }
 
-        private static List<AllowanceChargeType> CreateAllowanceCharge(decimal? discountAmount)
+        private static List<AllowanceChargeType> CreateAllowanceCharge(decimal? discountAmount, CurrencyCode currency)
         {
             return new List<AllowanceChargeType>
             {
@@ -406,7 +380,7 @@ namespace ShamDevs.EFatoraJo.Services
                 {
                     ChargeIndicator = new IndicatorType { Value = false },
                     AllowanceChargeReason = new List<TextType> { new TextType { Value = "DISCOUNT" } },
-                    Amount = CreateAmount(discountAmount ?? 0.00m)
+                    Amount = CreateAmount(discountAmount ?? 0.00m, currency)
                 }
             };
         }
