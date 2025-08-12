@@ -1,6 +1,6 @@
 # JoFatora .NET Client
 
-[![NuGet Version](https://img.shields.io/nuget/v/E.FatoraJo.svg)](https://www.nuget.org/packages/E.FatoraJo/)
+[![NuGet Version](https://img.shields.io/nuget/v/ShamDevs.EFatoraJo.Sdk.svg)](https://www.nuget.org/packages/ShamDevs.EFatoraJo.Sdk/)
 [![.NET Standard](https://img.shields.io/badge/.NET%20Standard-2.0%2B-blue.svg)](https://docs.microsoft.com/en-us/dotnet/standard/net-standard)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -47,31 +47,32 @@ SDK عالي الأداء مخصص للربط السلس مع منصة الفو�
 ### Package Manager
 
 ```bash
-Install-Package E.FatoraJo
-````
+Install-Package ShamDevs.EFatoraJo.Sdk
+```
 
 ### .NET CLI
 
 ```bash
-dotnet add package E.FatoraJo
+dotnet add package ShamDevs.EFatoraJo.Sdk
 ```
 
 ### PackageReference
 
 ```xml
-<PackageReference Include="E.FatoraJo" Version="1.0.0" />
+<PackageReference Include="ShamDevs.EFatoraJo.Sdk" Version="1.0.0" />
 ```
 
------
+---
 
 ## Quick Start
 
-### 1\. Submit a Standard Invoice
+### 1. Submit a Standard Invoice
 
 ```csharp
-using E_FatoraJo;
-using E_FatoraJo.Models;
-using E_FatoraJo.Enums;
+using ShamDevs.EFatoraJo;
+using ShamDevs.EFatoraJo.Models;
+using ShamDevs.EFatoraJo.Enums;
+using ShamDevs.EFatoraJo.Exceptions;
 
 var invoice = new Invoice
 {
@@ -82,16 +83,12 @@ var invoice = new Invoice
     InvoiceNote = "Standard sales invoice",
     Type = InvoiceType.Standard,
     Currency = CurrencyCode.JOD,
-    
-    // Supplier information
     Supplier = new Supplier
     {
         RegisteredSupplierName = "My Company Ltd",
         TaxVATNumber = "123456789",
         IncomeSourceSequence = "1"
     },
-    
-    // Customer information  
     Customer = new Customer
     {
         Name = "Customer Name",
@@ -101,8 +98,6 @@ var invoice = new Invoice
         PostalCode = "11118",
         PhoneNumber = "+962791234567"
     },
-    
-    // Invoice details
     InvoiceDetails = new List<InvoiceDetail>
     {
         new InvoiceDetail
@@ -117,8 +112,6 @@ var invoice = new Invoice
             TotalIncludingTax = 116.000m
         }
     },
-    
-    // Totals
     InvoiceTotals = new InvoiceTotals
     {
         TotalBeforeDiscount = 100.000m,
@@ -131,7 +124,6 @@ var invoice = new Invoice
 try
 {
     var response = await EFatoraJoSdk.SendFatoraAsync(invoice, "your_client_id", "your_secret_key");
-    
     if (response.IsSuccessfullySubmitted())
     {
         Console.WriteLine($"✅ Invoice submitted successfully!");
@@ -153,15 +145,14 @@ catch (EInvoiceApiException ex)
 }
 ```
 
-### 2\. Submit a Sales Return Invoice
+### 2. Submit a Sales Return Invoice
 
 ```csharp
 var returnInvoice = new SalesReturnInvoice
 {
     InvoiceNumber = "RET-2025-001",
     ReturnReason = "Customer requested refund",
-    OriginalInvoiceNumber = "INV-2025-001", // Reference to original invoice
-    // ... other required fields
+    OriginalInvoiceNumber = "INV-2025-001",
 };
 
 var returnResponse = await EFatoraJoSdk.SendReturnFatoraAsync(
@@ -175,7 +166,7 @@ if (returnResponse.IsSuccessfullySubmitted())
 }
 ```
 
------
+---
 
 ## Usage Examples
 
@@ -238,7 +229,7 @@ var eurInvoice = new Invoice
 };
 ```
 
------
+---
 
 ## Core Components
 
@@ -262,7 +253,7 @@ var eurInvoice = new Invoice
 | `RandomInvoiceGenerator` | Test data generation |
 | `InvoiceHelper` | UBL serialization utilities |
 
------
+---
 
 ## Validation
 
@@ -283,14 +274,14 @@ if (!validationResult.IsValid)
 
 ### Common Validation Rules
 
-  * **Invoice Number**: Must be unique and non-empty.
-  * **Dates**: Must be in ISO format (yyyy-MM-dd).
-  * **Tax Numbers**: Must be in a valid Jordan tax format.
-  * **Amounts**: Must be positive and properly formatted (3 decimal places).
-  * **Phone Numbers**: Must include the country code (+962).
-  * **Currency**: Must match the invoice currency throughout.
+* **Invoice Number**: Must be unique and non-empty.
+* **Dates**: Must be in ISO format (yyyy-MM-dd).
+* **Tax Numbers**: Must be in a valid Jordan tax format.
+* **Amounts**: Must be positive and properly formatted (3 decimal places).
+* **Phone Numbers**: Must include the country code (+962).
+* **Currency**: Must match the invoice currency throughout.
 
------
+---
 
 ## Error Handling
 
@@ -336,7 +327,7 @@ catch (Exception ex)
 }
 ```
 
------
+---
 
 ## Response Handling
 
@@ -390,7 +381,7 @@ if (response.IsSuccessfullySubmitted())
 }
 ```
 
------
+---
 
 ## Testing
 
@@ -412,52 +403,52 @@ The SDK includes a dedicated console application that you can use to generate an
 
 The application works in these simple steps:
 
-1.  **Configuration**: It reads your JoFatora API credentials and supplier information from user secrets.
-2.  **User Input**: It prompts you to select the type of invoice you want to test (e.g., General Sales, Special Sales, or Income) and the payment method.
-3.  **Generation**: It uses the `RandomInvoiceGenerator` to create a complete, valid invoice based on your selections.
-4.  **Submission**: It submits the generated invoice to the JoFatora API.
-5.  **Return Invoice**: For invoice types that support returns, it automatically generates and submits a corresponding return invoice to test the full lifecycle.
-6.  **Reporting**: It displays a detailed report on the submission status, including the QR code, submission ID, or any errors and warnings that occurred.
+1. **Configuration**: It reads your JoFatora API credentials and supplier information from user secrets.
+2. **User Input**: It prompts you to select the type of invoice you want to test (e.g., General Sales, Special Sales, or Income) and the payment method.
+3. **Generation**: It uses the `RandomInvoiceGenerator` to create a complete, valid invoice based on your selections.
+4. **Submission**: It submits the generated invoice to the JoFatora API.
+5. **Return Invoice**: For invoice types that support returns, it automatically generates and submits a corresponding return invoice to test the full lifecycle.
+6. **Reporting**: It displays a detailed report on the submission status, including the QR code, submission ID, or any errors and warnings that occurred.
 
 You can run this application directly to test your credentials and confirm that your setup is working correctly before integrating the SDK into your main application.
 
------
+---
 
 ## API Reference
 
 For detailed API documentation, including:
 
-  * Complete property mappings between C\# classes and UBL 2.1 XML elements.
-  * Jordan e-Invoicing Arabic labels.
-  * Response classes and enums.
-  * Advanced configuration options.
+* Complete property mappings between C\# classes and UBL 2.1 XML elements.
+* Jordan e-Invoicing Arabic labels.
+* Response classes and enums.
+* Advanced configuration options.
 
 See **[REFERENCE.md](REFERENCE.md)** for the comprehensive developer reference guide.
 
------
+---
 
 ## Requirements
 
-  * **JoFatora API credentials** (Client ID and Secret Key).
-  * **Network access** to JoFatora API endpoints.
+* **JoFatora API credentials** (Client ID and Secret Key).
+* **Network access** to JoFatora API endpoints.
 
 ### Compatibility
 
 The JoFatora .NET Client SDK is built on **.NET Standard 2.0+**, ensuring broad compatibility across various .NET platforms. This means you can seamlessly integrate it into applications targeting:
 
-  * **.NET Framework 4.6.1+**
-  * **.NET Core 2.0+** (including all subsequent .NET Core versions)
-  * **All versions of .NET 5+** (e.g., .NET 5, .NET 6, .NET 7, .NET 8, and future versions)
+* **.NET Framework 4.6.1+**
+* **.NET Core 2.0+** (including all subsequent .NET Core versions)
+* **All versions of .NET 5+** (e.g., .NET 5, .NET 6, .NET 7, .NET 8, and future versions)
 
 ### Dependencies
 
 The SDK automatically includes these dependencies:
 
-  * `System.Text.Json` for JSON processing.
-  * `System.Xml` for UBL document generation.
-  * `System.Net.Http` for API communication.
+* `System.Text.Json` for JSON processing.
+* `System.Xml` for UBL document generation.
+* `System.Net.Http` for API communication.
 
------
+---
 
 ## Contributing
 
@@ -465,42 +456,43 @@ We welcome contributions\! Please see our [Contributing Guide](https://www.googl
 
 ### Development Setup
 
-1.  Fork the repository.
-2.  Clone your fork: `git clone https://github.com/yourusername/jofatora-dotnet-sdk.git`
-3.  Create a feature branch: `git checkout -b feature/your-feature-name`
-4.  Make your changes and be sure to **add new tests or update existing ones** to cover your changes.
-5.  Run tests: `dotnet test`
-6.  Submit a pull request.
+1. Fork the repository.
+2. Clone your fork: `git clone https://github.com/yourusername/jofatora-dotnet-sdk.git`
+3. Create a feature branch: `git checkout -b feature/your-feature-name`
+4. Make your changes and be sure to **add new tests or update existing ones** to cover your changes.
+5. Run tests: `dotnet test`
+6. Submit a pull request.
 
 ### Reporting Issues
 
 Please report issues on our [GitHub Issues](https://www.google.com/search?q=https://github.com/yourorg/jofatora-dotnet-sdk/issues) page with:
 
-  * A clear description of the problem.
-  * Steps to reproduce.
-  * Expected vs. actual behavior.
-  * Sample code (if applicable).
-  * Environment details (.NET version, OS, etc.).
+* A clear description of the problem.
+* Steps to reproduce.
+* Expected vs. actual behavior.
+* Sample code (if applicable).
+* Environment details (.NET version, OS, etc.).
 
------
+---
 
 ### Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for a detailed version history.
 
------
+---
 
 ## License
 
 MIT License - see [LICENSE](LICENSE.md) file for the full license text.
 
------
+---
 
 ## Support
 
-  * 📖 **Documentation**: [Full API Reference](REFERENCE.md)
-  * 🐛 **Issues**: [GitHub Issues](https://github.com/sham-devs/EFatoraJo/issues)
-  * 💬 **Discussions**: [GitHub Discussions](https://github.com/sham-devs/EFatoraJo/discussions)
------
+* 📖 **Documentation**: [Full API Reference](REFERENCE.md)
+* 🐛 **Issues**: [GitHub Issues](https://github.com/sham-devs/EFatoraJo/issues)
+* 💬 **Discussions**: [GitHub Discussions](https://github.com/sham-devs/EFatoraJo/discussions)
+
+---
 
 **Made with ❤️ by [Sham Software Consultancy](https://shamconsultancy.com/) for the Jordanian developer community**

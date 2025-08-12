@@ -3,7 +3,6 @@
     public enum EInvoiceMessageStatus
     {
         PASS,
-        WARNING,
         ERROR
     }
 }
