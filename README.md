@@ -450,18 +450,15 @@ The SDK automatically includes these dependencies:
 
 ---
 
-## Contributing
+## 🤝 Contributing
 
-We welcome contributions\! Please see our [Contributing Guide](https://www.google.com/search?q=CONTRIBUTING.md) for details.
+We welcome contributions! Please see our [**Contributing Guidelines**](CONTRIBUTING.md) for details on:
 
-### Development Setup
-
-1. Fork the repository.
-2. Clone your fork: `git clone https://github.com/yourusername/jofatora-dotnet-sdk.git`
-3. Create a feature branch: `git checkout -b feature/your-feature-name`
-4. Make your changes and be sure to **add new tests or update existing ones** to cover your changes.
-5. Run tests: `dotnet test`
-6. Submit a pull request.
+* 🔧 How to set up your development environment
+* 📋 Our coding standards and best practices
+* 🔄 The pull request process
+* 🐛 How to report bugs and request features
+* 💬 Where to ask questions
 
 ### Reporting Issues
 
