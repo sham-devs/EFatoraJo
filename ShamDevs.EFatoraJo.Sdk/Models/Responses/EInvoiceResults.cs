@@ -1,13 +1,33 @@
+<<<<<<< HEAD
+﻿using ShamDevs.EFatoraJo.Enums;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.Json.Serialization;
+=======
 ﻿using Newtonsoft.Json;
 using ShamDevs.EFatoraJo.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+>>>>>>> 22f095a040cb70b6315767ed1773569f2609b27d
 
 namespace ShamDevs.EFatoraJo.Models.Responses
 {
     public class EInvoiceResults
     {
+<<<<<<< HEAD
+        [JsonPropertyName("status")]
+        public EInvoiceProcessingStatus Status { get; set; }
+
+        [JsonPropertyName("INFO")]
+        public List<EInvoiceMessage> Info { get; set; } = new List<EInvoiceMessage>();
+
+        [JsonPropertyName("WARNINGS")]
+        public List<EInvoiceMessage> Warnings { get; set; } = new List<EInvoiceMessage>();
+
+        [JsonPropertyName("ERRORS")]
+=======
         [JsonProperty("status")]
         public EInvoiceProcessingStatus Status { get; set; }
 
@@ -18,6 +38,7 @@ namespace ShamDevs.EFatoraJo.Models.Responses
         public List<EInvoiceMessage> Warnings { get; set; } = new List<EInvoiceMessage>();
 
         [JsonProperty("ERRORS")]
+>>>>>>> 22f095a040cb70b6315767ed1773569f2609b27d
         public List<EInvoiceMessage> Errors { get; set; } = new List<EInvoiceMessage>();
 
         public string GetFormattedErrors(int maxToShow = 5)
