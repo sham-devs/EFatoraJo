@@ -1,26 +1,26 @@
-﻿using Newtonsoft.Json;
+﻿using System.Text.Json.Serialization;
 using ShamDevs.EFatoraJo.Enums;
 
 namespace ShamDevs.EFatoraJo.Models.Responses
 {
     public class EInvoiceResponse
     {
-        [JsonProperty("EINV_RESULTS")]
+        [JsonPropertyName("EINV_RESULTS")]
         public EInvoiceResults Results { get; set; } = new EInvoiceResults();
 
-        [JsonProperty("EINV_STATUS")]
+        [JsonPropertyName("EINV_STATUS")]
         public EInvoiceStatus Status { get; set; }
 
-        [JsonProperty("EINV_SINGED_INVOICE")]
+        [JsonPropertyName("EINV_SINGED_INVOICE")]
         public string? SignedInvoice { get; set; }
 
-        [JsonProperty("EINV_QR")]
+        [JsonPropertyName("EINV_QR")]
         public string? Qr { get; set; }
 
-        [JsonProperty("EINV_NUM")]
+        [JsonPropertyName("EINV_NUM")]
         public string? InvoiceNumber { get; set; }
 
-        [JsonProperty("EINV_INV_UUID")]
+        [JsonPropertyName("EINV_INV_UUID")]
         public string? InvoiceUuid { get; set; }
 
         // Status check methods

@@ -1,5 +1,4 @@
-﻿using Newtonsoft.Json;
-using ShamDevs.EFatoraJo.Exceptions;
+﻿using ShamDevs.EFatoraJo.Exceptions;
 using ShamDevs.EFatoraJo.Models;
 using ShamDevs.EFatoraJo.Models.Responses;
 using ShamDevs.EFatoraJo.Services;
@@ -7,6 +6,8 @@ using ShamDevs.EFatoraJo.Utilities;
 using System;
 using System.Net.Http;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace ShamDevs.EFatoraJo
@@ -99,7 +100,7 @@ namespace ShamDevs.EFatoraJo
                         response: responseContent);
                 }
 
-                return JsonConvert.DeserializeObject<EInvoiceResponse>(responseContent)
+                return JsonSerializer.Deserialize<EInvoiceResponse>(responseContent, JsonOptions)
                     ?? throw new EInvoiceSerializationException("API returned empty or invalid response");
             }
             catch (EInvoiceException)
@@ -175,7 +176,7 @@ namespace ShamDevs.EFatoraJo
                         response: responseContent);
                 }
 
-                return JsonConvert.DeserializeObject<EInvoiceResponse>(responseContent)
+                return JsonSerializer.Deserialize<EInvoiceResponse>(responseContent, JsonOptions)
                     ?? throw new EInvoiceSerializationException("API returned empty or invalid response");
             }
             catch (EInvoiceException)
@@ -187,5 +188,14 @@ namespace ShamDevs.EFatoraJo
                 throw new EInvoiceException("Failed to process return invoice", ex);
             }
         }
+
+        private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower, // For snake_case properties
+            PropertyNameCaseInsensitive = true,
+            AllowTrailingCommas = true,
+            ReadCommentHandling = JsonCommentHandling.Skip,
+            Converters = { new JsonStringEnumConverter() }
+        };
     }
 }

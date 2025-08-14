@@ -1,23 +1,23 @@
-﻿using Newtonsoft.Json;
-using ShamDevs.EFatoraJo.Enums;
+﻿using ShamDevs.EFatoraJo.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Serialization;
 
 namespace ShamDevs.EFatoraJo.Models.Responses
 {
     public class EInvoiceResults
     {
-        [JsonProperty("status")]
+        [JsonPropertyName("status")]
         public EInvoiceProcessingStatus Status { get; set; }
 
-        [JsonProperty("INFO")]
+        [JsonPropertyName("INFO")]
         public List<EInvoiceMessage> Info { get; set; } = new List<EInvoiceMessage>();
 
-        [JsonProperty("WARNINGS")]
+        [JsonPropertyName("WARNINGS")]
         public List<EInvoiceMessage> Warnings { get; set; } = new List<EInvoiceMessage>();
 
-        [JsonProperty("ERRORS")]
+        [JsonPropertyName("ERRORS")]
         public List<EInvoiceMessage> Errors { get; set; } = new List<EInvoiceMessage>();
 
         public string GetFormattedErrors(int maxToShow = 5)

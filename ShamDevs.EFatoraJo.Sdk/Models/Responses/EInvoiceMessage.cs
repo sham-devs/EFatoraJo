@@ -1,24 +1,24 @@
-﻿using Newtonsoft.Json;
-using ShamDevs.EFatoraJo.Enums;
+﻿using ShamDevs.EFatoraJo.Enums;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace ShamDevs.EFatoraJo.Models.Responses
 {
     public class EInvoiceMessage
     {
-        [JsonProperty("type")]
+        [JsonPropertyName("type")]
         public EInvoiceMessageType Type { get; set; }
 
-        [JsonProperty("status")]
+        [JsonPropertyName("status")]
         public EInvoiceMessageStatus Status { get; set; }
 
-        [JsonProperty("EINV_CODE")]
+        [JsonPropertyName("EINV_CODE")]
         public string? Code { get; set; }
 
-        [JsonProperty("EINV_CATEGORY")]
+        [JsonPropertyName("EINV_CATEGORY")]
         public string? Category { get; set; }
 
-        [JsonProperty("EINV_MESSAGE")]
+        [JsonPropertyName("EINV_MESSAGE")]
         public string? Message { get; set; }
 
         public string ToFormattedString()
