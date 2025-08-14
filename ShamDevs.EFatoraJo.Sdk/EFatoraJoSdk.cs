@@ -1,4 +1,9 @@
+<<<<<<< HEAD
 ﻿using ShamDevs.EFatoraJo.Exceptions;
+=======
+﻿using Newtonsoft.Json;
+using ShamDevs.EFatoraJo.Exceptions;
+>>>>>>> 22f095a040cb70b6315767ed1773569f2609b27d
 using ShamDevs.EFatoraJo.Models;
 using ShamDevs.EFatoraJo.Models.Responses;
 using ShamDevs.EFatoraJo.Services;
@@ -6,8 +11,11 @@ using ShamDevs.EFatoraJo.Utilities;
 using System;
 using System.Net.Http;
 using System.Text;
+<<<<<<< HEAD
 using System.Text.Json;
 using System.Text.Json.Serialization;
+=======
+>>>>>>> 22f095a040cb70b6315767ed1773569f2609b27d
 using System.Threading.Tasks;
 
 namespace ShamDevs.EFatoraJo
@@ -100,7 +108,11 @@ namespace ShamDevs.EFatoraJo
                         response: responseContent);
                 }
 
+<<<<<<< HEAD
                 return JsonSerializer.Deserialize<EInvoiceResponse>(responseContent, JsonOptions)
+=======
+                return JsonConvert.DeserializeObject<EInvoiceResponse>(responseContent)
+>>>>>>> 22f095a040cb70b6315767ed1773569f2609b27d
                     ?? throw new EInvoiceSerializationException("API returned empty or invalid response");
             }
             catch (EInvoiceException)
@@ -176,7 +188,11 @@ namespace ShamDevs.EFatoraJo
                         response: responseContent);
                 }
 
+<<<<<<< HEAD
                 return JsonSerializer.Deserialize<EInvoiceResponse>(responseContent, JsonOptions)
+=======
+                return JsonConvert.DeserializeObject<EInvoiceResponse>(responseContent)
+>>>>>>> 22f095a040cb70b6315767ed1773569f2609b27d
                     ?? throw new EInvoiceSerializationException("API returned empty or invalid response");
             }
             catch (EInvoiceException)
@@ -188,6 +204,7 @@ namespace ShamDevs.EFatoraJo
                 throw new EInvoiceException("Failed to process return invoice", ex);
             }
         }
+<<<<<<< HEAD
 
         private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
         {
@@ -197,5 +214,7 @@ namespace ShamDevs.EFatoraJo
             ReadCommentHandling = JsonCommentHandling.Skip,
             Converters = { new JsonStringEnumConverter() }
         };
+=======
+>>>>>>> 22f095a040cb70b6315767ed1773569f2609b27d
     }
 }
