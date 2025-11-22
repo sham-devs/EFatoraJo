@@ -12,11 +12,7 @@
 		<Description>
       A high-performance .NET SDK designed for smooth integration with Jordan's JoFatora e-invoicing system.
       Built with clean architecture, fully async support, and simplified compliance with local tax regulations.
-<<<<<<< HEAD
-     
-=======
-      
->>>>>>> 22f095a040cb70b6315767ed1773569f2609b27d
+
       Features:
       - Full UBL 2.1 compliance
       - Pre-submission validation
@@ -27,52 +23,34 @@
 		<Company>Sham Software Consultancy</Company>
 		<Authors>ShamDevs</Authors>
 		<Copyright>Copyright © 2025 Sham Software Consultancy</Copyright>
-<<<<<<< HEAD
-		<!-- Package Documentation -->
-		<PackageReadmeFile>README.md</PackageReadmeFile>
-		<PackageLicenseFile>LICENSE.md</PackageLicenseFile>
-=======
 
 		<!-- Package Documentation -->
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageLicenseFile>LICENSE.md</PackageLicenseFile>
 
->>>>>>> 22f095a040cb70b6315767ed1773569f2609b27d
 		<!-- Repository Information -->
 		<RepositoryUrl>https://github.com/sham-devs/EFatoraJo</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
 		<PackageProjectUrl>https://github.com/sham-devs/EFatoraJo</PackageProjectUrl>
-<<<<<<< HEAD
+
 		<!-- Package Icon -->
 		<PackageIcon>JoFtoraIcon.png</PackageIcon>
+
 		<!-- Versioning -->
 		<Version>1.0.1</Version>
 		<AssemblyVersion>1.0.1.0</AssemblyVersion>
 		<FileVersion>1.0.1.0</FileVersion>
-=======
 
-		<!-- Package Icon -->
-		<PackageIcon>JoFtoraIcon.png</PackageIcon>
-
-		<!-- Versioning -->
-		<Version>1.0.0</Version>
-		<AssemblyVersion>1.0.0.0</AssemblyVersion>
-		<FileVersion>1.0.0.0</FileVersion>
-
->>>>>>> 22f095a040cb70b6315767ed1773569f2609b27d
 		<!-- Build settings -->
 		<LangVersion>8.0</LangVersion>
 		<Nullable>enable</Nullable>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<NoWarn>$(NoWarn);CS1591</NoWarn>
-<<<<<<< HEAD
 		<!-- Additional Quality Settings -->
 		<TreatWarningsAsErrors>false</TreatWarningsAsErrors>
 		<WarningsAsErrors />
 		<WarningsNotAsErrors />
-=======
->>>>>>> 22f095a040cb70b6315767ed1773569f2609b27d
 	</PropertyGroup>
 
 	<!-- Documentation and Icon files - Located in parent solution directory -->
@@ -84,7 +62,6 @@
 		<None Include="..\JoFtoraIcon.png" Pack="true" PackagePath="\" />
 	</ItemGroup>
 
-<<<<<<< HEAD
 	<!-- Core Dependencies with Stable Versions -->
 	<ItemGroup>
 		<!-- JSON libraries -->
@@ -102,9 +79,6 @@
 		<PackageReference Include="System.Threading.Tasks.Extensions" Version="4.5.4" />
 		<PackageReference Include="System.Buffers" Version="4.5.1" />
 		<PackageReference Include="System.Numerics.Vectors" Version="4.5.0" />
-
-		<!-- Optional: Keep Newtonsoft.Json only if needed for specific scenarios -->
-		<!-- <PackageReference Include="Newtonsoft.Json" Version="13.0.3" /> -->
 
 		<!-- HTTP client enhancements -->
 		<PackageReference Include="System.Net.Http" Version="4.3.4" />
@@ -174,32 +148,4 @@
     </PropertyGroup>
     -->
 
-=======
-	<!-- Dependencies -->
-	<ItemGroup>
-		<PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.0-preview.5.25277.114" />
-		<PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
-		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-		<PackageReference Include="System.Buffers" Version="4.6.1" />
-		<PackageReference Include="System.Data.DataSetExtensions" Version="4.5.0" />
-		<PackageReference Include="System.Diagnostics.DiagnosticSource" Version="10.0.0-preview.5.25277.114" />
-		<PackageReference Include="System.Formats.Asn1" Version="10.0.0-preview.5.25277.114" />
-		<PackageReference Include="System.IO.Pipelines" Version="10.0.0-preview.5.25277.114" />
-		<PackageReference Include="System.Memory" Version="4.6.3" />
-		<PackageReference Include="System.Numerics.Vectors" Version="4.6.1" />
-		<PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.1.2" />
-		<PackageReference Include="System.Text.Encodings.Web" Version="10.0.0-preview.5.25277.114" />
-		<PackageReference Include="System.Text.Json" Version="10.0.0-preview.5.25277.114" />
-		<PackageReference Include="System.Threading.Tasks.Extensions" Version="4.6.3" />
-		<PackageReference Include="UblSharp" Version="1.1.1" />
-	</ItemGroup>
-
-	<!-- Legacy SCC -->
-	<PropertyGroup>
-		<SccProjectName>SAK</SccProjectName>
-		<SccLocalPath>SAK</SccLocalPath>
-		<SccAuxPath>SAK</SccAuxPath>
-		<SccProvider>SAK</SccProvider>
-	</PropertyGroup>
->>>>>>> 22f095a040cb70b6315767ed1773569f2609b27d
 </Project>

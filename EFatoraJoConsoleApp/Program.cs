@@ -235,11 +235,7 @@ namespace EFatoraJoConsoleApp
             }
 
             Console.WriteLine("\nPress any key to exit...");
-<<<<<<< HEAD
             //Console.ReadKey();
-=======
-            Console.ReadKey();
->>>>>>> 22f095a040cb70b6315767ed1773569f2609b27d
         }
 
         // ------------------------------------------------------------------
