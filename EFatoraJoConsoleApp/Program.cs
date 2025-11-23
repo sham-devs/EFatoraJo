@@ -1,360 +1,463 @@
-﻿// Program.cs
+using EFatoraJoConsoleApp.Commands;
+using EFatoraJoConsoleApp.Helpers;
+using EFatoraJoConsoleApp.Models;
+using EFatoraJoConsoleApp.Output;
 using Microsoft.Extensions.Configuration;
 using ShamDevs.EFatoraJo;
 using ShamDevs.EFatoraJo.Enums;
 using ShamDevs.EFatoraJo.Exceptions;
 using ShamDevs.EFatoraJo.Models;
 using ShamDevs.EFatoraJo.Models.Responses;
-using ShamDevs.EFatoraJo.Utilities;
 using System.Text;
+using static EFatoraJoConsoleApp.Output.OutputHandler;
 
 namespace EFatoraJoConsoleApp
 {
     class Program
     {
-        static async Task Main()
+        static async Task<int> Main(string[] args)
         {
             Console.OutputEncoding = Encoding.UTF8;
-            Console.WriteLine("EFatoraJo Invoice Generator");
-            Console.WriteLine("===========================");
-
-            // ------------------------------------------------------------------
-            // Read ALL required secrets
-            // ------------------------------------------------------------------
-            var cfg = new ConfigurationBuilder()
-                .AddUserSecrets<Program>()
-                .Build();
-
-            string clientId = cfg["ClientId"] ?? string.Empty;
-            string secretKey = cfg["SecretKey"] ?? string.Empty;
-
-            var supplierCfg = cfg.GetSection("Supplier");
-            string taxVATNumber = supplierCfg["TaxVATNumber"] ?? string.Empty;
-            string incomeSourceSequence = supplierCfg["IncomeSourceSequence"] ?? string.Empty;
-            string registeredSupplierName = supplierCfg["RegisteredSupplierName"] ?? string.Empty;
-
-            bool missing = false;
-            void CheckSecret(string value, string name)
-            {
-                if (string.IsNullOrWhiteSpace(value))
-                {
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine($"ERROR: Missing secret \"{name}\"");
-                    Console.ResetColor();
-                    missing = true;
-                }
-            }
-
-            CheckSecret(clientId, nameof(clientId));
-            CheckSecret(secretKey, nameof(secretKey));
-            CheckSecret(taxVATNumber, "Supplier:TaxVATNumber");
-            CheckSecret(incomeSourceSequence, "Supplier:IncomeSourceSequence");
-            CheckSecret(registeredSupplierName, "Supplier:RegisteredSupplierName");
-
-            if (missing)
-            {
-                Console.WriteLine("\nSet the missing secrets with:");
-                Console.WriteLine("  dotnet user-secrets set <key> \"<value>\"");
-                return;
-            }
-
-            var supplierInfo = new Supplier(
-                taxVATNumber ?? string.Empty,
-                incomeSourceSequence ?? string.Empty,
-                registeredSupplierName ?? string.Empty);
 
             try
             {
-                // ------------------------------------------------------------------
-                // Invoice Type selection
-                // ------------------------------------------------------------------
-                Console.WriteLine("\nAvailable Invoice Types:");
-                Console.WriteLine("1: General Sales (with return capability)");
-                Console.WriteLine("2: Special Sales (with return capability)");
-                Console.WriteLine("3: Income (no returns)");
-
-                int invoiceTypeChoice;
-                while (true)
+                if (args.Length > 0)
                 {
-                    Console.Write("Select invoice type (1-3, blank=1): ");
-                    var input = Console.ReadLine();
-
-                    if (string.IsNullOrWhiteSpace(input))
-                    {
-                        invoiceTypeChoice = 1;
-                        break;
-                    }
-
-                    if (int.TryParse(input, out invoiceTypeChoice) && invoiceTypeChoice >= 1 && invoiceTypeChoice <= 3)
-                    {
-                        break;
-                    }
-                    Console.WriteLine("Invalid input. Please enter 1, 2, or 3.");
+                    return await RunCommandLineModeAsync(args);
                 }
-
-                var invoiceType = invoiceTypeChoice switch
+                else
                 {
-                    1 => InvoiceType.GeneralSales,
-                    2 => InvoiceType.SpecialSales,
-                    3 => InvoiceType.Income,
-                    _ => InvoiceType.GeneralSales
-                };
-
-                // ------------------------------------------------------------------
-                // Invoice Payment Type Code selection
-                // ------------------------------------------------------------------
-                Console.WriteLine("\nAvailable Invoice Payment Type Codes:");
-                var validPaymentTypes = GetValidPaymentTypesForInvoiceType(invoiceType).ToList();
-                DisplayPaymentTypes(validPaymentTypes);
-
-                InvoicePaymentTypeCode paymentType;
-                while (true)
-                {
-                    Console.Write($"Enter Invoice Payment Type Code (1-{validPaymentTypes.Count}, blank={GetDefaultPaymentTypeForInvoiceType(invoiceType)}): ");
-                    string? input = Console.ReadLine();
-
-                    if (string.IsNullOrWhiteSpace(input))
-                    {
-                        paymentType = GetDefaultPaymentTypeForInvoiceType(invoiceType);
-                        break;
-                    }
-
-                    if (int.TryParse(input, out int selectedIndex) &&
-                        selectedIndex >= 1 &&
-                        selectedIndex <= validPaymentTypes.Count)
-                    {
-                        paymentType = validPaymentTypes[selectedIndex - 1];
-                        break;
-                    }
-
-                    Console.WriteLine($"Invalid input. Please enter a number between 1 and {validPaymentTypes.Count}.");
+                    return await RunInteractiveModeAsync();
                 }
-
-                // ------------------------------------------------------------------
-                // Currency selection
-                // ------------------------------------------------------------------
-                Console.WriteLine("\nAvailable Currencies:");
-                foreach (var c in Enum.GetValues<CurrencyCode>())
-                    Console.WriteLine($"{(int)c}: {c} ({c.GetStringValue()})");
-
-                CurrencyCode currency = GetEnumInput(
-                    "Enter Currency Code (blank = JOD): ",
-                    CurrencyCode.JOD);
-
-                // ------------------------------------------------------------------
-                // Generate and submit main invoice
-                // ------------------------------------------------------------------
-                Console.WriteLine("\nGenerating and submitting invoice...");
-                var invoice = RandomInvoiceGenerator.GenerateRandomInvoice(
-                    supplierInfo: supplierInfo,
-                    invoicePaymentType: paymentType,
-                    currency: currency,
-                    invoiceTpe: invoiceType);
-
-                var invoiceResponse = await EFatoraJoSdk.SendFatoraAsync(
-                    invoice,
-                    clientId ?? string.Empty,
-                    secretKey ?? string.Empty);
-
-                // In the Main method where we handle the invoice response:
-                if (invoiceResponse.IsSuccessfullySubmitted())
-                {
-                    Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"\nInvoice {invoiceResponse.InvoiceNumber} submitted successfully!");
-                    Console.WriteLine($"QR Code: {invoiceResponse.Qr}");
-                    Console.ResetColor();
-
-                    // ------------------------------------------------------------------
-                    // Generate and submit return invoice for ALL supported types
-                    // ------------------------------------------------------------------
-                    Console.WriteLine("\nGenerating and submitting return invoice...");
-
-                    try
-                    {
-                        var returnInvoice = RandomInvoiceGenerator.GenerateRandomSalesReturnInvoice(
-                            originalInvoice: invoice,
-                            currency: currency);
-
-                        var returnResponse = await EFatoraJoSdk.SendReturnFatoraAsync(
-                            returnInvoice,
-                            clientId ?? string.Empty,
-                            secretKey ?? string.Empty);
-
-                        if (returnResponse.IsSuccessfullySubmitted())
-                        {
-                            Console.ForegroundColor = ConsoleColor.Green;
-                            Console.WriteLine("\nReturn invoice submitted successfully!");
-                            Console.WriteLine($"Return Reference: {returnResponse.InvoiceNumber}");
-                            Console.WriteLine($"For Original Invoice: {returnInvoice.ReturnedInvoice?.InvoiceNumber ?? "N/A"}");
-                            Console.ResetColor();
-                        }
-                        else
-                        {
-                            HandleFailedResponse(returnResponse, "return invoice");
-                        }
-                    }
-                    catch (NotSupportedException ex)
-                    {
-                        Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.WriteLine($"\nReturn invoice not supported: {ex.Message}");
-                        Console.ResetColor();
-                    }
-                }
-            }
-            catch (InvoiceValidationException ex)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("\nInvoice validation failed:");
-                foreach (var error in ex.ValidationErrors ?? [])
-                    Console.WriteLine($"- {error}");
-                Console.ResetColor();
-            }
-            catch (EInvoiceApiException ex) when (ex.StatusCode == 401)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("\nAuthentication failed – please check your secrets.");
-                Console.ResetColor();
-            }
-            catch (EInvoiceApiException ex)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"\nAPI Error ({ex.StatusCode}):\n{ex.ResponseContent ?? string.Empty}");
-                Console.ResetColor();
-            }
-            catch (EInvoiceException ex)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"\nE-Invoice Error: {ex.Message}");
-                Console.ResetColor();
             }
             catch (Exception ex)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"\nUnexpected error: {ex.Message}");
-                Console.ResetColor();
-            }
-
-            Console.WriteLine("\nPress any key to exit...");
-            //Console.ReadKey();
-        }
-
-        // ------------------------------------------------------------------
-        // Helper methods
-        // ------------------------------------------------------------------
-        private static TEnum GetEnumInput<TEnum>(string prompt, TEnum defaultValue, IEnumerable<TEnum>? validValues = null)
-            where TEnum : struct, Enum
-        {
-            while (true)
-            {
-                Console.Write(prompt);
-                string? input = Console.ReadLine();
-
-                if (string.IsNullOrWhiteSpace(input))
-                    return defaultValue;
-
-                if (Enum.TryParse<TEnum>(input, out var result))
-                {
-                    if (Enum.IsDefined(result) && (validValues == null || validValues.Contains(result)))
-                        return result;
-                }
-
-                if (int.TryParse(input, out int intVal) && Enum.IsDefined(typeof(TEnum), intVal))
-                {
-                    var res = (TEnum)(object)intVal;
-                    if (validValues == null || validValues.Contains(res))
-                        return res;
-                }
-
-                Console.WriteLine($"Invalid input. Please enter a valid {typeof(TEnum).Name} value or code.");
+                OutputHandler.WriteUnexpectedError(OutputFormat.Text, ex);
+                return ExitCodes.UnexpectedError;
             }
         }
 
-        private static void HandleFailedResponse(EInvoiceResponse? response, string invoiceType)
+        static async Task<int> RunCommandLineModeAsync(string[] args)
         {
-            if (response == null)
+            var cmdArgs = CommandLineArgs.Parse(args);
+
+            // Handle --help
+            if (cmdArgs.Help)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"\nReceived null response for {invoiceType}");
-                Console.ResetColor();
-                return;
+                CommandLineArgs.ShowHelp();
+                return ExitCodes.Success;
             }
 
-            if (response.IsAlreadySubmitted())
+            // Handle --version
+            if (cmdArgs.Version)
             {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"\n{invoiceType} was already submitted");
-                if (!string.IsNullOrEmpty(response.Qr))
-                    Console.WriteLine($"This {invoiceType} has a valid QR code: {response.Qr}");
-                Console.ResetColor();
+                CommandLineArgs.ShowVersion();
+                return ExitCodes.Success;
             }
-            else if (response.HasErrors())
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"\n{invoiceType} submission failed with errors:");
-                Console.WriteLine(response.GetFormattedErrors());
 
-                if (response.HasWarnings())
+            // Handle --sample
+            if (!string.IsNullOrEmpty(cmdArgs.Sample))
+            {
+                ShowSample(cmdArgs.Sample);
+                return ExitCodes.Success;
+            }
+
+            // Parse output format
+            var outputFormat = (cmdArgs.OutputFormat?.ToLower()) switch
+            {
+                "json" => OutputFormat.Json,
+                "text" or null => OutputFormat.Text,
+                _ => OutputFormat.Text
+            };
+
+            if (cmdArgs.OutputFormat != null && cmdArgs.OutputFormat.ToLower() != "json" && cmdArgs.OutputFormat.ToLower() != "text")
+            {
+                OutputHandler.WriteError(outputFormat, ExitCodes.ConfigurationError, "Invalid output format. Use 'json' or 'text'.");
+                return ExitCodes.ConfigurationError;
+            }
+
+            // Load configuration
+            var (clientId, secretKey, supplier, missingSecrets) = InvoiceCommandHandler.LoadConfiguration();
+
+            if (missingSecrets.Count > 0)
+            {
+                OutputHandler.WriteConfigurationError(outputFormat,
+                    "Missing required configuration in user secrets", missingSecrets);
+                return ExitCodes.ConfigurationError;
+            }
+
+            // Create command handler
+            var handler = new InvoiceCommandHandler(clientId, secretKey, supplier, outputFormat);
+
+            // Determine invoice source
+            if (!string.IsNullOrEmpty(cmdArgs.InvoiceJson))
+            {
+                // JSON string input
+                if (cmdArgs.InvoiceJson == "-")
                 {
-                    Console.WriteLine("\nAdditional warnings:");
-                    Console.WriteLine(response.GetFormattedWarnings());
+                    // Stdin input
+                    return await handler.ProcessInvoiceFromStdinAsync();
                 }
-                Console.ResetColor();
+                else
+                {
+                    // Direct JSON string
+                    return await handler.ProcessInvoiceAsync(cmdArgs.InvoiceJson, cmdArgs.ReturnJson);
+                }
+            }
+            else if (!string.IsNullOrEmpty(cmdArgs.InvoiceFile))
+            {
+                // File input
+                return await handler.ProcessInvoiceFromFileAsync(cmdArgs.InvoiceFile, cmdArgs.ReturnFile);
             }
             else
             {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"\nReceived unknown response status for {invoiceType}");
-                Console.ResetColor();
+                OutputHandler.WriteError(outputFormat, ExitCodes.ConfigurationError,
+                    "No invoice provided. Use --invoice-json or --invoice-file");
+                return ExitCodes.ConfigurationError;
             }
         }
 
-        private static InvoicePaymentTypeCode[] GetValidPaymentTypesForInvoiceType(InvoiceType invoiceType)
+        static async Task<int> RunInteractiveModeAsync()
         {
-            return invoiceType switch
+            Console.WriteLine("╔════════════════════════════════════════════╗");
+            Console.WriteLine("║   EFatoraJo - Jordan E-Invoice Client      ║");
+            Console.WriteLine("║   Console Test Application                 ║");
+            Console.WriteLine("╚════════════════════════════════════════════╝");
+            Console.WriteLine();
+
+            // Load configuration
+            var config = new ConfigurationBuilder()
+                .AddUserSecrets<Program>()
+                .Build();
+
+            var clientId = config["EFatora:ClientId"];
+            var secretKey = config["EFatora:SecretKey"];
+
+            if (string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(secretKey))
             {
-                InvoiceType.Income =>
-                [
-                    InvoicePaymentTypeCode.LocalIncomeCash,       // 010
-                    InvoicePaymentTypeCode.LocalIncomeCredit,     // 020
-                    InvoicePaymentTypeCode.ExportIncomeCash,      // 011
-                    InvoicePaymentTypeCode.ExportIncomeCredit      // 021
-                ],
-                InvoiceType.GeneralSales =>
-                [
-                    InvoicePaymentTypeCode.LocalGeneralSalesCash,     // 012
-                    InvoicePaymentTypeCode.LocalGeneralSalesCredit,    // 022
-                    InvoicePaymentTypeCode.ExportGeneralSalesCash,    // 013
-                    InvoicePaymentTypeCode.ExportGeneralSalesCredit   // 023
-                ],
-                InvoiceType.SpecialSales =>
-                [
-                    InvoicePaymentTypeCode.LocalSpecialSalesCash,     // 014
-                    InvoicePaymentTypeCode.LocalSpecialSalesCredit,    // 024
-                    InvoicePaymentTypeCode.ExportSpecialSalesCash,     // 015
-                    InvoicePaymentTypeCode.ExportSpecialSalesCredit    // 025
-                ],
-                _ => Enum.GetValues<InvoicePaymentTypeCode>()
+                Console.WriteLine("❌ Error: Missing configuration in User Secrets");
+                Console.WriteLine("Please configure EFatora:ClientId and EFatora:SecretKey");
+                Console.WriteLine("\nTo set user secrets, run:");
+                Console.WriteLine("  dotnet user-secrets set \"EFatora:ClientId\" \"your-client-id\"");
+                Console.WriteLine("  dotnet user-secrets set \"EFatora:SecretKey\" \"your-secret-key\"");
+                return ExitCodes.ConfigurationError;
+            }
+
+            Console.WriteLine($"✓ Client ID: {clientId}");
+            Console.WriteLine();
+
+            while (true)
+            {
+                try
+                {
+                    // Select invoice type
+                    Console.WriteLine("\n═══════════════════════════════════════════");
+                    Console.WriteLine("Select Invoice Type:");
+                    Console.WriteLine("  1 - Income Invoice (فاتورة دخل)");
+                    Console.WriteLine("  2 - General Sales Invoice (فاتورة مبيعات عامة)");
+                    Console.WriteLine("  3 - Special Sales Invoice (فاتورة مبيعات خاصة)");
+                    Console.WriteLine("  0 - Exit");
+                    Console.Write("\nChoice: ");
+
+                    var choice = Console.ReadLine();
+
+                    if (choice == "0") break;
+
+                    InvoiceType invoiceType = choice switch
+                    {
+                        "1" => InvoiceType.Income,
+                        "2" => InvoiceType.GeneralSales,
+                        "3" => InvoiceType.SpecialSales,
+                        _ => throw new InvalidOperationException("Invalid choice")
+                    };
+
+                    // Generate random invoice
+                    var invoice = GenerateRandomInvoice(invoiceType, config);
+
+                    Console.WriteLine("\n📄 Generated Invoice:");
+                    Console.WriteLine($"   Type: {invoiceType}");
+                    Console.WriteLine($"   Number: {invoice.InvoiceNumber}");
+                    Console.WriteLine($"   Date: {invoice.InvoiceDate}");
+                    Console.WriteLine($"   Customer: {invoice.Customer.Name}");
+                    Console.WriteLine($"   Total: {invoice.InvoiceTotals.TotalInvoiceAmount:F2} JOD");
+
+                    // Submit invoice
+                    Console.WriteLine("\n📤 Submitting invoice...");
+                    var response = await EFatoraJoSdk.SendFatoraAsync(invoice, clientId, secretKey);
+
+                    if (response.IsSuccessfullySubmitted())
+                    {
+                        Console.WriteLine("\n✅ Invoice submitted successfully!");
+                        Console.WriteLine($"   Invoice Number: {response.InvoiceNumber}");
+                        Console.WriteLine($"   QR Code: {response.Qr}");
+                    }
+                    else
+                    {
+                        HandleFailedResponse(response);
+                    }
+
+                    // Ask about return invoice
+                    Console.Write("\n🔄 Create return invoice? (y/n): ");
+                    if (Console.ReadLine()?.ToLower() == "y")
+                    {
+                        var returnInvoice = new SalesReturnInvoice(
+                            invoiceNumber: $"RET-{DateTime.Now:yyyyMMdd-HHmmss}",
+                            returnedInvoice: invoice,
+                            uniqueSerialNumber: Guid.NewGuid().ToString(),
+                            invoiceDate: DateTime.Now.ToString("yyyy-MM-dd"),
+                            returnReason: "Customer return - Interactive mode"
+                        );
+
+                        Console.WriteLine("\n📤 Submitting return invoice...");
+                        var returnResponse = await EFatoraJoSdk.SendReturnFatoraAsync(returnInvoice, clientId, secretKey);
+
+                        if (returnResponse.IsSuccessfullySubmitted())
+                        {
+                            Console.WriteLine("\n✅ Return invoice submitted successfully!");
+                            Console.WriteLine($"   Return Invoice Number: {returnResponse.InvoiceNumber}");
+                        }
+                        else
+                        {
+                            HandleFailedResponse(returnResponse);
+                        }
+                    }
+                }
+                catch (InvalidOperationException)
+                {
+                    Console.WriteLine("❌ Invalid choice. Please try again.");
+                }
+                catch (InvoiceValidationException ex)
+                {
+                    Console.WriteLine($"\n❌ Validation Error: {ex.Message}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"\n❌ Error: {ex.Message}");
+                }
+            }
+
+            Console.WriteLine("\n👋 Goodbye!");
+            return ExitCodes.Success;
+        }
+
+        static void ShowSample(string sampleType)
+        {
+            var samples = new Dictionary<string, string>
+            {
+                ["income"] = @"{
+  ""invoiceNumber"": ""INV-2024-001"",
+  ""uniqueSerialNumber"": ""550e8400-e29b-41d4-a716-446655440000"",
+  ""invoiceDate"": ""2024-01-15"",
+  ""invoiceType"": ""Income"",
+  ""paymentType"": ""Cash"",
+  ""customer"": {
+    ""name"": ""Ahmad Hassan"",
+    ""taxNumber"": ""1234567890"",
+    ""mobileNumber"": ""962791234567""
+  },
+  ""invoiceLines"": [
+    {
+      ""itemName"": ""Consulting Services"",
+      ""itemQuantity"": 10,
+      ""itemPrice"": 100.00,
+      ""totalAmount"": 1000.00
+    }
+  ],
+  ""totalInvoiceAmount"": 1000.00,
+  ""invoiceNote"": ""Professional consulting services""
+}",
+                ["general"] = @"{
+  ""invoiceNumber"": ""GEN-2024-001"",
+  ""uniqueSerialNumber"": ""550e8400-e29b-41d4-a716-446655440001"",
+  ""invoiceDate"": ""2024-01-15"",
+  ""invoiceType"": ""GeneralSales"",
+  ""paymentType"": ""Cash"",
+  ""customer"": {
+    ""name"": ""Retail Customer"",
+    ""mobileNumber"": ""962791234567""
+  },
+  ""invoiceLines"": [
+    {
+      ""itemName"": ""Product A"",
+      ""itemQuantity"": 5,
+      ""itemPrice"": 20.00,
+      ""taxPercent"": 16.0,
+      ""totalAmount"": 100.00
+    }
+  ],
+  ""totalInvoiceAmount"": 116.00,
+  ""invoiceNote"": ""General sales invoice""
+}",
+                ["special"] = @"{
+  ""invoiceNumber"": ""SPC-2024-001"",
+  ""uniqueSerialNumber"": ""550e8400-e29b-41d4-a716-446655440002"",
+  ""invoiceDate"": ""2024-01-15"",
+  ""invoiceType"": ""SpecialSales"",
+  ""paymentType"": ""Cash"",
+  ""customer"": {
+    ""name"": ""Special Customer"",
+    ""taxNumber"": ""9876543210"",
+    ""mobileNumber"": ""962791234567""
+  },
+  ""invoiceLines"": [
+    {
+      ""itemName"": ""Special Item"",
+      ""itemQuantity"": 3,
+      ""itemPrice"": 150.00,
+      ""taxPercent"": 16.0,
+      ""totalAmount"": 450.00
+    }
+  ],
+  ""totalInvoiceAmount"": 522.00,
+  ""invoiceNote"": ""Special sales invoice""
+}",
+                ["return"] = @"{
+  ""invoiceNumber"": ""RET-2024-001"",
+  ""uniqueSerialNumber"": ""550e8400-e29b-41d4-a716-446655440003"",
+  ""invoiceDate"": ""2024-01-15"",
+  ""invoiceType"": ""Income"",
+  ""paymentType"": ""Cash"",
+  ""customer"": {
+    ""name"": ""Return Customer"",
+    ""mobileNumber"": ""962791234567""
+  },
+  ""invoiceLines"": [
+    {
+      ""itemName"": ""Returned Item"",
+      ""itemQuantity"": 2,
+      ""itemPrice"": 50.00,
+      ""totalAmount"": 100.00
+    }
+  ],
+  ""totalInvoiceAmount"": 100.00,
+  ""invoiceNote"": ""Product return""
+}"
+            };
+
+            if (samples.TryGetValue(sampleType.ToLower(), out var sample))
+            {
+                Console.WriteLine(sample);
+            }
+            else
+            {
+                Console.WriteLine($"Unknown sample type: {sampleType}");
+                Console.WriteLine("Available samples: income, general, special, return");
+            }
+        }
+
+        static Invoice GenerateRandomInvoice(InvoiceType invoiceType, IConfiguration config)
+        {
+            var random = new Random();
+            var timestamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+            var invoiceNumber = $"INV-{timestamp}";
+
+            var customerNames = new[] { "Ahmad Hassan", "Fatima Ali", "Mohammed Ibrahim", "Sara Khalil", "Omar Mustafa" };
+            var customerName = customerNames[random.Next(customerNames.Length)];
+
+            var paymentTypes = GetValidPaymentTypesForInvoiceType(invoiceType);
+            var paymentType = paymentTypes[random.Next(paymentTypes.Length)];
+
+            var customer = new Customer(customerName);
+
+            var itemNames = new[] { "Product A", "Service B", "Item C", "Consulting D", "Equipment E" };
+            var itemCount = random.Next(1, 4);
+            var invoiceDetails = new List<InvoiceDetail>();
+            decimal totalBeforeVAT = 0;
+            decimal totalVAT = 0;
+
+            var taxCategory = invoiceType == InvoiceType.Income ? TaxCategoryCode.Z : TaxCategoryCode.S;
+
+            for (int i = 0; i < itemCount; i++)
+            {
+                var quantity = random.Next(1, 10);
+                var price = Math.Round((decimal)(random.NextDouble() * 100 + 10), 2);
+                var lineTotal = quantity * price;
+
+                var vatPercent = invoiceType == InvoiceType.Income ? 0.0 : 16.0;
+                var vatAmount = Math.Round(lineTotal * (decimal)(vatPercent / 100), 2);
+
+                var detail = new InvoiceDetail(
+                    id: $"LINE-{i + 1}",
+                    taxCategory: taxCategory,
+                    description: itemNames[random.Next(itemNames.Length)]
+                )
+                {
+                    Quantity = quantity,
+                    UnitPriceBeforeTax = price,
+                    TotalBeforeTax = lineTotal,
+                    TaxAmount = vatAmount,
+                    TotalIncludingTax = lineTotal + vatAmount
+                };
+
+                invoiceDetails.Add(detail);
+
+                totalBeforeVAT += lineTotal;
+                totalVAT += vatAmount;
+            }
+
+            var invoiceTotals = new InvoiceTotals
+            {
+                TotalVATAmount = totalVAT,
+                TotalSpecialTaxAmount = 0,
+                TotalBeforeDiscount = totalBeforeVAT,
+                TotalInvoiceAmount = totalBeforeVAT + totalVAT,
+                TotalDiscountAmount = 0,
+                FinalPayableAmount = totalBeforeVAT + totalVAT
+            };
+
+            var supplier = new Supplier(
+                taxVATNumber: config["EFatora:Supplier:TaxNumber"] ?? "0000000000",
+                incomeSourceSequence: config["EFatora:Supplier:ActivityCode"] ?? "62010",
+                registeredSupplierName: config["EFatora:Supplier:Name"] ?? "Default Supplier"
+            );
+
+            return new Invoice(
+                invoiceNumber: invoiceNumber,
+                uniqueSerialNumber: Guid.NewGuid().ToString(),
+                invoiceDate: DateTime.Now.ToString("yyyy-MM-dd"),
+                paymentType: paymentType,
+                supplier: supplier,
+                customer: customer,
+                invoiceTotals: invoiceTotals,
+                invoiceDetails: invoiceDetails,
+                type: invoiceType
+            )
+            {
+                InvoiceNote = $"Test invoice generated at {DateTime.Now}"
             };
         }
 
-        private static InvoicePaymentTypeCode GetDefaultPaymentTypeForInvoiceType(InvoiceType invoiceType)
+        static InvoicePaymentTypeCode[] GetValidPaymentTypesForInvoiceType(InvoiceType invoiceType)
         {
             return invoiceType switch
             {
-                InvoiceType.Income => InvoicePaymentTypeCode.LocalIncomeCredit,
-                InvoiceType.GeneralSales => InvoicePaymentTypeCode.LocalGeneralSalesCredit,
-                InvoiceType.SpecialSales => InvoicePaymentTypeCode.LocalSpecialSalesCredit,
-                _ => InvoicePaymentTypeCode.LocalGeneralSalesCredit
+                InvoiceType.Income => [InvoicePaymentTypeCode.LocalIncomeCash, InvoicePaymentTypeCode.LocalIncomeCredit],
+                InvoiceType.GeneralSales => [InvoicePaymentTypeCode.LocalGeneralSalesCash, InvoicePaymentTypeCode.LocalGeneralSalesCredit],
+                InvoiceType.SpecialSales => [InvoicePaymentTypeCode.LocalSpecialSalesCash, InvoicePaymentTypeCode.LocalSpecialSalesCredit],
+                _ => [InvoicePaymentTypeCode.LocalGeneralSalesCash]
             };
         }
 
-        private static void DisplayPaymentTypes(IEnumerable<InvoicePaymentTypeCode> paymentTypes)
+        static void HandleFailedResponse(EInvoiceResponse response)
         {
-            int index = 1; // Changed from 0 to 1
-            foreach (var t in paymentTypes)
+            Console.WriteLine("\n❌ Invoice submission failed!");
+
+            if (response.Results?.Errors != null && response.Results.Errors.Count > 0)
             {
-                Console.WriteLine($"{index}: {t} ({t.GetStringValue()})");
-                index++;
+                Console.WriteLine("\nErrors:");
+                foreach (var error in response.Results.Errors)
+                {
+                    Console.WriteLine($"  - {error.Message}");
+                }
+            }
+
+            if (response.Results?.Warnings != null && response.Results.Warnings.Count > 0)
+            {
+                Console.WriteLine("\nWarnings:");
+                foreach (var warning in response.Results.Warnings)
+                {
+                    Console.WriteLine($"  - {warning.Message}");
+                }
             }
         }
     }

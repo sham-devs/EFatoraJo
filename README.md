@@ -422,8 +422,21 @@ For detailed API documentation, including:
 * Jordan e-Invoicing Arabic labels.
 * Response classes and enums.
 * Advanced configuration options.
+* Complete method signatures and parameters.
+* Exception handling patterns.
+* Usage examples and best practices.
 
 See **[REFERENCE.md](REFERENCE.md)** for the comprehensive developer reference guide.
+
+### Additional Documentation
+
+For comprehensive guides on specific topics:
+
+* **[API-DOCUMENTATION.md](API-DOCUMENTATION.md)** - Complete API documentation with all methods, models, and examples
+* **[ERROR-HANDLING.md](ERROR-HANDLING.md)** - Comprehensive error handling guide with troubleshooting
+* **[ADVANCED-EXAMPLES.md](ADVANCED-EXAMPLES.md)** - Advanced usage examples and integration patterns
+* **[CONFIGURATION-GUIDE.md](CONFIGURATION-GUIDE.md)** - Complete configuration guide for all environments
+* **[PRODUCTION-GUIDE.md](EFatoraJoConsoleApp/PRODUCTION-GUIDE.md)** - Production deployment guide for console application
 
 ---
 
