@@ -9,7 +9,11 @@
       "Bash(powershell.exe:*)",
       "Bash(dotnet build:*)",
       "Bash(python:*)",
-      "Bash(dotnet run:*)"
+      "Bash(dotnet run:*)",
+      "Bash(dotnet:*)",
+      "Bash(nul)",
+      "Bash(pip install:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

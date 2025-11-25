@@ -93,26 +93,52 @@ public class InvoiceCommandHandler
                 InvoiceNote = invoice.InvoiceNote
             };
 
-            // Submit invoice
-            var response = await SubmitInvoiceAsync(invoice);
-            if (response == null)
-            {
-                return Environment.ExitCode; // Error already written
-            }
-
-            // Process return invoice if provided
+            // If return invoice is provided, skip sending original invoice
+            // and use it only as reference data for the return invoice
             if (!string.IsNullOrWhiteSpace(returnJson))
             {
+                // Validate minimal required fields from original invoice
+                if (string.IsNullOrWhiteSpace(invoice.InvoiceNumber))
+                {
+                    OutputHandler.WriteError(_outputFormat, ExitCodes.ValidationError,
+                        "Original invoice validation failed",
+                        new List<ErrorDetail>
+                        {
+                            new ErrorDetail { Message = "Original invoice must have invoiceNumber for return reference" }
+                        });
+                    return ExitCodes.ValidationError;
+                }
+
+                if (string.IsNullOrWhiteSpace(invoice.UniqueSerialNumber))
+                {
+                    OutputHandler.WriteError(_outputFormat, ExitCodes.ValidationError,
+                        "Original invoice validation failed",
+                        new List<ErrorDetail>
+                        {
+                            new ErrorDetail { Message = "Original invoice must have uniqueSerialNumber for return reference" }
+                        });
+                    return ExitCodes.ValidationError;
+                }
+
+                // Process return invoice directly using original invoice as reference only
                 var returnResponse = await ProcessReturnInvoiceAsync(returnJson, invoice);
                 if (returnResponse != null && returnResponse.IsSuccessfullySubmitted())
                 {
                     OutputHandler.WriteSuccess(_outputFormat,
-                        "Invoice and return invoice submitted successfully",
-                        invoiceNumber: response.InvoiceNumber,
-                        qrCode: response.Qr,
-                        returnInvoiceNumber: returnResponse.InvoiceNumber);
+                        $"Return invoice submitted successfully. Original invoice {invoice.InvoiceNumber} was used as reference only (not sent to system).",
+                        invoiceNumber: returnResponse.InvoiceNumber,
+                        qrCode: returnResponse.Qr);
                     return ExitCodes.Success;
                 }
+
+                return Environment.ExitCode; // Error already written by ProcessReturnInvoiceAsync
+            }
+
+            // Submit invoice (only when no return invoice is provided)
+            var response = await SubmitInvoiceAsync(invoice);
+            if (response == null)
+            {
+                return Environment.ExitCode; // Error already written
             }
 
             OutputHandler.WriteSuccess(_outputFormat,
@@ -207,17 +233,10 @@ public class InvoiceCommandHandler
 
             if (response.IsAlreadySubmitted())
             {
-                OutputHandler.WriteError(_outputFormat, ExitCodes.ApiError,
-                    "Invoice was already submitted",
-                    new List<ErrorDetail>
-                    {
-                        new ErrorDetail
-                        {
-                            Message = "This invoice has already been submitted to the system",
-                            ActualValue = response.Qr
-                        }
-                    });
-                return null;
+                // If invoice was already submitted, we still return the response
+                // This allows processing of return invoices for already submitted invoices
+                // The caller will check if we have a return invoice to process
+                return response;
             }
 
             OutputHandler.WriteApiError(_outputFormat, response);
@@ -300,6 +319,24 @@ public class InvoiceCommandHandler
             OutputHandler.WriteValidationErrors(_outputFormat,
                 "Return invoice validation failed",
                 ex.ValidationErrors?.ToList() ?? new List<string>());
+            return null;
+        }
+        catch (EInvoiceApiException ex) when (ex.StatusCode == 401)
+        {
+            OutputHandler.WriteAuthenticationError(_outputFormat);
+            return null;
+        }
+        catch (EInvoiceApiException ex)
+        {
+            OutputHandler.WriteError(_outputFormat, ExitCodes.ApiError,
+                $"Return Invoice API Error (HTTP {ex.StatusCode})",
+                new List<ErrorDetail>
+                {
+                    new ErrorDetail
+                    {
+                        Message = $"API Response: {ex.ResponseContent ?? ex.Message}"
+                    }
+                });
             return null;
         }
         catch (NotSupportedException ex)

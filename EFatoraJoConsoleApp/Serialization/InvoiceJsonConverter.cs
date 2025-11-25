@@ -18,6 +18,9 @@ public class InvoiceJsonConverter : JsonConverter<Invoice>
 
         try
         {
+            // Check for common mistakes first
+            DetectCommonMistakes(root);
+
             // Extract all required properties with validation
             var invoiceNumber = GetRequiredString(root, "invoiceNumber");
             var uniqueSerialNumber = GetRequiredString(root, "uniqueSerialNumber");
@@ -63,6 +66,20 @@ public class InvoiceJsonConverter : JsonConverter<Invoice>
         catch (Exception ex)
         {
             throw new JsonException($"Failed to deserialize Invoice: {ex.Message}", ex);
+        }
+    }
+
+    private static void DetectCommonMistakes(JsonElement root)
+    {
+        // Check if this looks like a return invoice file instead of a regular invoice
+        if (root.TryGetProperty("returnReason", out _) || root.TryGetProperty("returnedInvoice", out _))
+        {
+            throw new JsonException(
+                "This file appears to be a return invoice with nested structure. " +
+                "Return invoice files should use the regular invoice JSON structure (not nested). " +
+                "Remove 'returnReason' and 'returnedInvoice' properties from the JSON file. " +
+                "The return invoice structure is created internally by the application when you use --return-file option."
+            );
         }
     }
 
@@ -190,7 +207,7 @@ public class InvoiceJsonConverter : JsonConverter<Invoice>
             customer.IdentificationNumber = idNum.GetString();
         }
 
-        if (customerElement.TryGetProperty("identificationType", out var idType))
+        if (customerElement.TryGetProperty("identificationType", out var idType) && idType.ValueKind != JsonValueKind.Null)
         {
             customer.IdentificationType = ParseEnum<IdentificationType>(idType, "identificationType");
         }

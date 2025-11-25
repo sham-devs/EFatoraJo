@@ -309,6 +309,8 @@ dotnet EFatoraJoConsoleApp.dll --invoice-file invoice.json --output-format json 
 
 ### 3. Submit Invoice with Return Invoice
 
+**Note:** The application will automatically handle cases where the original invoice was already submitted. If you submit an already-submitted invoice with a return invoice, the application will skip re-submitting the original and proceed directly to submitting the return invoice.
+
 **Windows:**
 
 ```powershell
@@ -460,10 +462,91 @@ The application requires a complete JSON structure that includes all necessary o
   "customer": {
     "name": "Customer Name",                    // Required
     "identificationNumber": "987654321",        // Optional
-    "identificationType": "NationalID",          // Optional
+    "identificationType": "NIN",                // Optional - Valid values: "NIN", "PN", "TN" (see notes below)
     "phoneNumber": "962791234567",            // Optional
     "city": "Amman",                           // Optional
     "postalCode": "11118"                      // Optional
+  }
+}
+```
+
+#### Important Notes on `identificationType`
+
+**Valid Values:**
+
+- `"NIN"` - National ID Number (الرقم الوطني)
+- `"PN"` - Passport Number (رقم جواز السفر)
+- `"TN"` - Tax Number (الرقم الضريبي)
+
+**⚠️ Common Mistakes:**
+
+- ❌ **DO NOT** use `"NationalID"` - use `"NIN"` instead
+- ❌ **DO NOT** use `"PassportNumber"` - use `"PN"` instead
+- ❌ **DO NOT** use `"TaxNumber"` - use `"TN"` instead
+- ❌ **DO NOT** set the value to `null` - either omit the field entirely or use a valid value
+
+**Usage Rules:**
+
+- Both `identificationNumber` and `identificationType` are **optional fields**
+- **IMPORTANT:** If you provide `identificationType`, you **MUST** also provide `identificationNumber`
+- However, you can provide `identificationNumber` without `identificationType` (though not recommended)
+- If you don't need customer identification, **omit both fields entirely** from the JSON
+- When present, `identificationType` must contain one of the three valid values above
+- You can set either field to `null` - the application will treat it as if the field is omitted
+
+**Valid Examples:**
+
+```json
+// Example 1: With identification
+{
+  "customer": {
+    "name": "Ahmad Hassan",
+    "identificationNumber": "9876543210",
+    "identificationType": "NIN"
+  }
+}
+
+// Example 2: Without identification (both fields omitted)
+{
+  "customer": {
+    "name": "Ahmad Hassan"
+  }
+}
+```
+
+**Invalid Examples:**
+
+```json
+// ❌ WRONG: Using "NationalID" instead of "NIN"
+{
+  "customer": {
+    "name": "Ahmad Hassan",
+    "identificationNumber": "9876543210",
+    "identificationType": "NationalID"  // This will cause error!
+  }
+}
+
+// ❌ WRONG: Setting identificationType to null
+{
+  "customer": {
+    "name": "Ahmad Hassan",
+    "identificationType": null  // This will cause error!
+  }
+}
+
+// ❌ WRONG: Having identificationType without identificationNumber
+{
+  "customer": {
+    "name": "Ahmad Hassan",
+    "identificationType": "NIN"  // Error! identificationNumber is required when identificationType is provided
+  }
+}
+
+// ✅ ACCEPTABLE: Having identificationNumber without identificationType
+{
+  "customer": {
+    "name": "Ahmad Hassan",
+    "identificationNumber": "9876543210"  // OK, but not recommended
   }
 }
 ```
@@ -619,7 +702,9 @@ The application implements strict validation for all JSON input to ensure data i
 - Invoice types must be valid `InvoiceType` values
 - Currency codes must be valid `CurrencyCode` values
 - Tax categories must be valid `TaxCategoryCode` values
+- Identification types must be valid `IdentificationType` values: `NIN`, `PN`, or `TN`
 - **Error Example**: `Invalid InvoicePaymentTypeCode value 'Cash' for property 'paymentType'`
+- **Error Example**: `Invalid IdentificationType value 'NationalID' for property 'identificationType'`
 
 ### Common Validation Errors and Solutions
 
@@ -641,8 +726,101 @@ The application implements strict validation for all JSON input to ensure data i
 - Use "S" for Sales invoices (standard rate)
 
 #### Error: "invoiceDetails must contain at least one item"
+
 **Problem**: Empty invoice details array
 **Solution**: Ensure at least one item is present in the invoiceDetails array
+
+#### Error: "Invalid IdentificationType value"
+
+**Problem**: Using incorrect values for customer `identificationType` field
+
+**Common Mistakes**:
+
+- Using `"NationalID"` instead of `"NIN"`
+- Using `"PassportNumber"` instead of `"PN"`
+- Using `"TaxNumber"` instead of `"TN"`
+- Setting the value to `null` instead of omitting the field
+
+**Solution**: Use only these exact values:
+
+- `"NIN"` for National ID Number (الرقم الوطني)
+- `"PN"` for Passport Number (رقم جواز السفر)
+- `"TN"` for Tax Number (الرقم الضريبي)
+
+**Examples**:
+
+```json
+// ✅ CORRECT: Using "NIN"
+{
+  "customer": {
+    "name": "Ahmad Hassan",
+    "identificationNumber": "9876543210",
+    "identificationType": "NIN"
+  }
+}
+
+// ✅ CORRECT: Omitting both identification fields
+{
+  "customer": {
+    "name": "Ahmad Hassan"
+  }
+}
+
+// ❌ WRONG: Using "NationalID"
+{
+  "customer": {
+    "name": "Ahmad Hassan",
+    "identificationNumber": "9876543210",
+    "identificationType": "NationalID"  // Error!
+  }
+}
+
+// ❌ WRONG: Using null (though now accepted, it's not recommended)
+{
+  "customer": {
+    "name": "Ahmad Hassan",
+    "identificationType": null  // Now accepted but omitting the field is better
+  }
+}
+
+// ❌ WRONG: Having identificationType without identificationNumber
+{
+  "customer": {
+    "name": "Ahmad Hassan",
+    "identificationType": "NIN"  // Error! Must provide identificationNumber
+  }
+}
+```
+
+#### Error: "Customer IdentificationNumber is required when IdentificationType is specified"
+
+**Problem**: Providing `identificationType` without `identificationNumber`
+
+**Solution**: If you specify an `identificationType`, you must also provide an `identificationNumber`. The rule is:
+
+- Both fields are optional
+- But if you provide `identificationType`, then `identificationNumber` becomes required
+
+**Example**:
+
+```json
+// ❌ WRONG
+{
+  "customer": {
+    "name": "Ahmad Hassan",
+    "identificationType": "NIN"  // Missing identificationNumber!
+  }
+}
+
+// ✅ CORRECT
+{
+  "customer": {
+    "name": "Ahmad Hassan",
+    "identificationNumber": "9876543210",
+    "identificationType": "NIN"
+  }
+}
+```
 
 ### JSON Validation Tools
 
@@ -1566,6 +1744,37 @@ Details:
    - General Sales: `LocalGeneralSalesCash` or `LocalGeneralSalesCredit`
    - Special Sales: `LocalSpecialSalesCash` or `LocalSpecialSalesCredit`
 2. Update your JSON templates and scripts to use correct values
+
+---
+
+### Issue: Invoice Already Submitted (ApiError)
+
+**Symptoms:**
+```
+Invoice was already submitted. Proceeding with return invoice submission if provided.
+```
+
+**Behavior:**
+
+- When submitting an invoice that was previously submitted, the application will detect this
+- If you're also submitting a return invoice (using `--return-file` or `--return-json`), the application will automatically skip re-submitting the original invoice and proceed directly to submitting the return invoice
+- This allows you to submit return invoices for already-submitted invoices without errors
+
+**Example:**
+
+```bash
+# This will work even if invoice.json was already submitted
+dotnet EFatoraJoConsoleApp.dll \
+  --invoice-file invoice.json \
+  --return-file return.json \
+  --output-format json
+```
+
+**Result:**
+
+- Original invoice: Skipped (already submitted)
+- Return invoice: Submitted successfully
+- Exit code: 0 (Success)
 
 ---
 

@@ -80,8 +80,9 @@ namespace ShamDevs.EFatoraJo.Utilities
                 return errors;
             }
 
-            if (string.IsNullOrWhiteSpace(customer.IdentificationNumber))
-                errors.Add("Customer IdentificationNumber is required");
+            // IdentificationNumber is optional, but if IdentificationType is provided, IdentificationNumber must also be provided
+            if (customer.IdentificationType.HasValue && string.IsNullOrWhiteSpace(customer.IdentificationNumber))
+                errors.Add("Customer IdentificationNumber is required when IdentificationType is specified");
 
             if (string.IsNullOrWhiteSpace(customer.Name))
                 errors.Add("Customer Name is required");
