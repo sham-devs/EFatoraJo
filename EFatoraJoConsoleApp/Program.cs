@@ -9,6 +9,7 @@ using ShamDevs.EFatoraJo.Exceptions;
 using ShamDevs.EFatoraJo.Models;
 using ShamDevs.EFatoraJo.Models.Responses;
 using System.Text;
+using System.Text.Json;
 using static EFatoraJoConsoleApp.Output.OutputHandler;
 
 namespace EFatoraJoConsoleApp
@@ -62,59 +63,59 @@ namespace EFatoraJoConsoleApp
                 return ExitCodes.Success;
             }
 
-            // Parse output format
-            var outputFormat = (cmdArgs.OutputFormat?.ToLower()) switch
+            // Validate command mode (invoice XOR return)
+            string? modeError = cmdArgs.ValidateCommandMode();
+            if (modeError != null)
             {
-                "json" => OutputFormat.Json,
-                "text" or null => OutputFormat.Text,
-                _ => OutputFormat.Text
+                WriteJsonError("CommandModeError", modeError);
+                return ExitCodes.ConfigurationError;
+            }
+
+            // Validate credentials are provided
+            var missingCreds = cmdArgs.ValidateCredentials();
+            if (missingCreds.Count > 0)
+            {
+                WriteJsonError("MissingCredentials",
+                    "Required credentials not provided",
+                    missingCreds);
+                return ExitCodes.ConfigurationError;
+            }
+
+            // Create command handler with credentials from command line
+            var handler = new InvoiceCommandHandler(cmdArgs.ClientId!, cmdArgs.SecretKey!);
+
+            // Route to appropriate handler based on command type
+            if (!string.IsNullOrWhiteSpace(cmdArgs.InvoiceFile))
+            {
+                return await handler.ProcessInvoiceCommand(cmdArgs.InvoiceFile);
+            }
+            else if (!string.IsNullOrWhiteSpace(cmdArgs.ReturnFile))
+            {
+                return await handler.ProcessReturnInvoiceCommand(cmdArgs.ReturnFile);
+            }
+
+            // Should never reach here due to ValidateCommandMode
+            WriteJsonError("InternalError", "Unexpected code path");
+            return ExitCodes.UnexpectedError;
+        }
+
+        static void WriteJsonError(string errorType, string message, List<string>? errors = null)
+        {
+            var output = new
+            {
+                success = false,
+                errorType = errorType,
+                message = message,
+                errors = errors ?? new List<string>()
             };
 
-            if (cmdArgs.OutputFormat != null && cmdArgs.OutputFormat.ToLower() != "json" && cmdArgs.OutputFormat.ToLower() != "text")
+            var options = new JsonSerializerOptions
             {
-                OutputHandler.WriteError(outputFormat, ExitCodes.ConfigurationError, "Invalid output format. Use 'json' or 'text'.");
-                return ExitCodes.ConfigurationError;
-            }
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            };
 
-            // Load configuration
-            var (clientId, secretKey, supplier, missingSecrets) = InvoiceCommandHandler.LoadConfiguration();
-
-            if (missingSecrets.Count > 0)
-            {
-                OutputHandler.WriteConfigurationError(outputFormat,
-                    "Missing required configuration in user secrets", missingSecrets);
-                return ExitCodes.ConfigurationError;
-            }
-
-            // Create command handler
-            var handler = new InvoiceCommandHandler(clientId, secretKey, supplier, outputFormat);
-
-            // Determine invoice source
-            if (!string.IsNullOrEmpty(cmdArgs.InvoiceJson))
-            {
-                // JSON string input
-                if (cmdArgs.InvoiceJson == "-")
-                {
-                    // Stdin input
-                    return await handler.ProcessInvoiceFromStdinAsync();
-                }
-                else
-                {
-                    // Direct JSON string
-                    return await handler.ProcessInvoiceAsync(cmdArgs.InvoiceJson, cmdArgs.ReturnJson);
-                }
-            }
-            else if (!string.IsNullOrEmpty(cmdArgs.InvoiceFile))
-            {
-                // File input
-                return await handler.ProcessInvoiceFromFileAsync(cmdArgs.InvoiceFile, cmdArgs.ReturnFile);
-            }
-            else
-            {
-                OutputHandler.WriteError(outputFormat, ExitCodes.ConfigurationError,
-                    "No invoice provided. Use --invoice-json or --invoice-file");
-                return ExitCodes.ConfigurationError;
-            }
+            Console.WriteLine(JsonSerializer.Serialize(output, options));
         }
 
         static async Task<int> RunInteractiveModeAsync()

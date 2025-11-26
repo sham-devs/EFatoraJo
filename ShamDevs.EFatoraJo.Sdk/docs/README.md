@@ -23,8 +23,7 @@ This directory contains comprehensive documentation for the EFatoraJo project, i
 
 | Document | Description | Audience |
 |----------|-------------|----------|
-| [`PRODUCTION-GUIDE.md`](PRODUCTION-GUIDE.md) | Console application production deployment guide | System administrators |
-| [`../EFatoraJoConsoleApp/PRODUCTION-GUIDE.md`](../EFatoraJoConsoleApp/PRODUCTION-GUIDE.md) | Console application production deployment guide | System administrators |
+| [`../EFatoraJoConsoleApp/README.md`](../EFatoraJoConsoleApp/README.md) | Complete console application documentation | System administrators |
 
 ---
 
@@ -32,7 +31,7 @@ This directory contains comprehensive documentation for the EFatoraJo project, i
 
 1. **New Users**: Start with [`../README.md`](../README.md) for project overview and installation
 2. **Developers**: Refer to [`API-DOCUMENTATION.md`](API-DOCUMENTATION.md) for complete SDK reference
-3. **System Administrators**: See [`PRODUCTION-GUIDE.md`](PRODUCTION-GUIDE.md) for deployment instructions
+3. **System Administrators**: See [`../EFatoraJoConsoleApp/README.md`](../EFatoraJoConsoleApp/README.md) for console application documentation
 4. **Troubleshooting**: Use [`ERROR-HANDLING.md`](ERROR-HANDLING.md) for error resolution
 
 ---
@@ -82,11 +81,13 @@ This directory contains comprehensive documentation for the EFatoraJo project, i
   - Monitoring configuration
 
 ### Deployment
-- **Console Application**: [`PRODUCTION-GUIDE.md`](PRODUCTION-GUIDE.md)
-  - Installation and setup
+- **Console Application**: [`../EFatoraJoConsoleApp/README.md`](../EFatoraJoConsoleApp/README.md)
+  - Complete documentation including installation and setup
   - Service configuration
   - Platform-specific instructions
   - Integration examples
+  - CLI usage and examples
+  - Batch processing scripts
 
 ---
 
@@ -100,7 +101,7 @@ This directory contains comprehensive documentation for the EFatoraJo project, i
 | Submit First Invoice | [`../README.md`](../README.md) | Quick Start |
 | Handle Errors | [`ERROR-HANDLING.md`](ERROR-HANDLING.md) | Error Handling |
 | Configure Production | [`CONFIGURATION-GUIDE.md`](CONFIGURATION-GUIDE.md) | Configuration |
-| Deploy Console App | [`PRODUCTION-GUIDE.md`](PRODUCTION-GUIDE.md) | Deployment |
+| Deploy Console App | [`../EFatoraJoConsoleApp/README.md`](../EFatoraJoConsoleApp/README.md) | Deployment |
 
 ### Error Resolution
 
