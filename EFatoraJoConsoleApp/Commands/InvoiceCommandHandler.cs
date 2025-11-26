@@ -1,3 +1,4 @@
+using EFatoraJoConsoleApp.Models;
 using EFatoraJoConsoleApp.Serialization;
 using ShamDevs.EFatoraJo;
 using ShamDevs.EFatoraJo.Exceptions;
@@ -15,12 +16,6 @@ public class InvoiceCommandHandler
     private readonly string _clientId;
     private readonly string _secretKey;
 
-    private static readonly JsonSerializerOptions JsonOutputOptions = new()
-    {
-        WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    };
-
     public InvoiceCommandHandler(string clientId, string secretKey)
     {
         _clientId = clientId;
@@ -30,7 +25,7 @@ public class InvoiceCommandHandler
     /// <summary>
     /// Process a regular sales invoice from file
     /// </summary>
-    public async Task<int> ProcessInvoiceCommand(string filePath)
+    public async Task<CommandResult> ProcessInvoiceCommand(string filePath)
     {
         try
         {
@@ -44,76 +39,81 @@ public class InvoiceCommandHandler
             // 3. Process result
             if (response.IsSuccessfullySubmitted())
             {
-                WriteSuccessOutput(response);
-                return 0; // Success
+                return CommandResult.SuccessResult(response, "Invoice submitted successfully");
             }
 
             // Handle already submitted invoices as success (they were previously accepted)
             if (response.IsAlreadySubmitted())
             {
-                WriteAlreadySubmittedOutput(response);
-                return 0; // Success - invoice was already submitted
+                return CommandResult.SuccessResult(response, "Invoice was already submitted", alreadySubmitted: true);
             }
 
-            WriteApiErrorOutput(response);
-            return 2; // API Error
+            return CreateApiErrorResult(response);
         }
         catch (FileNotFoundException)
         {
-            WriteErrorOutput("FileNotFoundError",
+            return CommandResult.ErrorResult(
+                ExitCodes.FileNotFoundError,
+                "FileNotFoundError",
                 $"File not found: {filePath}",
                 new List<string> { $"The file '{filePath}' does not exist" });
-            return 6;
         }
         catch (JsonException ex)
         {
-            WriteErrorOutput("JsonParseError",
+            return CommandResult.ErrorResult(
+                ExitCodes.JsonParseError,
+                "JsonParseError",
                 "Failed to parse invoice JSON",
                 new List<string> { ex.Message });
-            return 4;
         }
         catch (InvoiceValidationException ex)
         {
-            WriteErrorOutput("InvoiceValidationException",
+            return CommandResult.ErrorResult(
+                ExitCodes.ValidationError,
+                "InvoiceValidationException",
                 "Invoice validation failed",
                 ex.ValidationErrors?.ToList() ?? new List<string>());
-            return 1;
         }
         catch (UblGenerationException ex)
         {
-            WriteErrorOutput("UblGenerationException",
+            return CommandResult.ErrorResult(
+                ExitCodes.ApiError,
+                "UblGenerationException",
                 "UBL document generation failed",
                 new List<string> { ex.Message, ex.InnerException?.Message ?? "" });
-            return 2;
         }
         catch (EInvoiceSerializationException ex)
         {
-            WriteErrorOutput("EInvoiceSerializationException",
+            return CommandResult.ErrorResult(
+                ExitCodes.ApiError,
+                "EInvoiceSerializationException",
                 "XML serialization failed",
                 new List<string> { ex.Message });
-            return 2;
         }
         catch (EInvoiceApiException ex)
         {
             var errors = ParseApiErrorResponse(ex.ResponseContent, ex.Message);
-            WriteErrorOutput("EInvoiceApiException",
+            return CommandResult.ErrorResult(
+                ex.StatusCode == 401 ? ExitCodes.AuthenticationError : ExitCodes.ApiError,
+                "EInvoiceApiException",
                 $"API communication failed (HTTP {ex.StatusCode})",
                 errors);
-            return ex.StatusCode == 401 ? 3 : 2;
         }
         catch (EInvoiceException ex)
         {
-            WriteErrorOutput("EInvoiceException",
+            return CommandResult.ErrorResult(
+                ExitCodes.UnexpectedError,
+                "EInvoiceException",
                 "Unexpected error during invoice processing",
                 new List<string> { ex.Message, ex.InnerException?.Message ?? "" });
-            return 99;
         }
         catch (Exception ex)
         {
-            WriteErrorOutput("UnexpectedException",
+            return CommandResult.ErrorResult(
+                ExitCodes.UnexpectedError,
+                "UnexpectedException",
                 "An unexpected error occurred",
                 new List<string> { ex.Message });
-            return 99;
         }
     }
 
@@ -186,41 +186,26 @@ public class InvoiceCommandHandler
     /// <summary>
     /// Process a return invoice from file
     /// </summary>
-    public async Task<int> ProcessReturnInvoiceCommand(string filePath)
+    public async Task<CommandResult> ProcessReturnInvoiceCommand(string filePath)
     {
         try
         {
             // 1. Read and parse JSON file containing return invoice data
             string json = await File.ReadAllTextAsync(filePath);
+            var returnInput = ReturnInvoiceJsonParser.Parse(json);
 
-            // Parse JSON to check for returnUniqueSerialNumber field
-            var jsonDoc = System.Text.Json.JsonDocument.Parse(json);
-            string? returnUuid = null;
-            if (jsonDoc.RootElement.TryGetProperty("returnUniqueSerialNumber", out var returnUuidElement))
-            {
-                returnUuid = returnUuidElement.GetString();
-            }
-
-            // The JSON should contain the original invoice structure
-            // We parse it as a regular invoice first to get the structure
-            Invoice originalInvoice = InvoiceJsonParser.ParseInvoice(json);
-
-            // 2. Generate new UUID for return invoice if not provided
-            // The returnUniqueSerialNumber is for the RETURN invoice (new UUID)
-            // The originalInvoice.UniqueSerialNumber is the ORIGINAL invoice UUID
-            string returnInvoiceUuid = !string.IsNullOrEmpty(returnUuid)
-                ? returnUuid
-                : Guid.NewGuid().ToString();
+            // 2. Use provided return UUID or generate a new one
+            var returnInvoiceUuid = string.IsNullOrWhiteSpace(returnInput.ReturnUUID)
+                ? Guid.NewGuid().ToString()
+                : returnInput.ReturnUUID!;
 
             // 3. Create SalesReturnInvoice using the parsed data
-            // Note: returnedInvoice contains the original invoice with its UUID
-            // uniqueSerialNumber is the NEW UUID for the return invoice
             var returnInvoice = new SalesReturnInvoice(
-                invoiceNumber: $"RET-{originalInvoice.InvoiceNumber}",
-                returnedInvoice: originalInvoice,
-                uniqueSerialNumber: returnInvoiceUuid,  // NEW UUID for return invoice
-                invoiceDate: originalInvoice.InvoiceDate,
-                returnReason: originalInvoice.InvoiceNote ?? "Product return"
+                invoiceNumber: returnInput.ReturnInvoiceNumber,
+                returnedInvoice: returnInput.OriginalInvoice,
+                uniqueSerialNumber: returnInvoiceUuid,
+                invoiceDate: returnInput.ReturnInvoiceDate,
+                returnReason: returnInput.ReturnReason
             );
 
             // 3. Call SDK for return invoice
@@ -229,129 +214,88 @@ public class InvoiceCommandHandler
             // 4. Process result
             if (response.IsSuccessfullySubmitted())
             {
-                WriteSuccessOutput(response);
-                return 0; // Success
+                return CommandResult.SuccessResult(response, "Return invoice submitted successfully");
             }
 
             // Handle already submitted invoices as success (they were previously accepted)
             if (response.IsAlreadySubmitted())
             {
-                WriteAlreadySubmittedOutput(response);
-                return 0; // Success - invoice was already submitted
+                return CommandResult.SuccessResult(response, "Return invoice was already submitted", alreadySubmitted: true);
             }
 
-            WriteApiErrorOutput(response);
-            return 2; // API Error
+            return CreateApiErrorResult(response);
         }
         catch (FileNotFoundException)
         {
-            WriteErrorOutput("FileNotFoundError",
+            return CommandResult.ErrorResult(
+                ExitCodes.FileNotFoundError,
+                "FileNotFoundError",
                 $"File not found: {filePath}",
                 new List<string> { $"The file '{filePath}' does not exist" });
-            return 6;
         }
         catch (JsonException ex)
         {
-            WriteErrorOutput("JsonParseError",
+            return CommandResult.ErrorResult(
+                ExitCodes.JsonParseError,
+                "JsonParseError",
                 "Failed to parse return invoice JSON",
                 new List<string> { ex.Message });
-            return 4;
         }
         catch (InvoiceValidationException ex)
         {
-            WriteErrorOutput("InvoiceValidationException",
+            return CommandResult.ErrorResult(
+                ExitCodes.ValidationError,
+                "InvoiceValidationException",
                 "Return invoice validation failed",
                 ex.ValidationErrors?.ToList() ?? new List<string>());
-            return 1;
         }
         catch (UblGenerationException ex)
         {
-            WriteErrorOutput("UblGenerationException",
+            return CommandResult.ErrorResult(
+                ExitCodes.ApiError,
+                "UblGenerationException",
                 "Return UBL document generation failed",
                 new List<string> { ex.Message, ex.InnerException?.Message ?? "" });
-            return 2;
         }
         catch (EInvoiceSerializationException ex)
         {
-            WriteErrorOutput("EInvoiceSerializationException",
+            return CommandResult.ErrorResult(
+                ExitCodes.ApiError,
+                "EInvoiceSerializationException",
                 "XML serialization failed for return invoice",
                 new List<string> { ex.Message });
-            return 2;
         }
         catch (EInvoiceApiException ex)
         {
             var errors = ParseApiErrorResponse(ex.ResponseContent, ex.Message);
-            WriteErrorOutput("EInvoiceApiException",
+            return CommandResult.ErrorResult(
+                ex.StatusCode == 401 ? ExitCodes.AuthenticationError : ExitCodes.ApiError,
+                "EInvoiceApiException",
                 $"API communication failed for return invoice (HTTP {ex.StatusCode})",
                 errors);
-            return ex.StatusCode == 401 ? 3 : 2;
         }
         catch (EInvoiceException ex)
         {
-            WriteErrorOutput("EInvoiceException",
+            return CommandResult.ErrorResult(
+                ExitCodes.UnexpectedError,
+                "EInvoiceException",
                 "Unexpected error during return invoice processing",
                 new List<string> { ex.Message, ex.InnerException?.Message ?? "" });
-            return 99;
         }
         catch (Exception ex)
         {
-            WriteErrorOutput("UnexpectedException",
+            return CommandResult.ErrorResult(
+                ExitCodes.UnexpectedError,
+                "UnexpectedException",
                 "An unexpected error occurred",
                 new List<string> { ex.Message });
-            return 99;
         }
     }
 
     /// <summary>
-    /// Write success output in the required JSON format
+    /// Build API error result when response contains errors/warnings
     /// </summary>
-    private void WriteSuccessOutput(EInvoiceResponse response)
-    {
-        var output = new
-        {
-            success = true,
-            result = response
-        };
-
-        Console.WriteLine(JsonSerializer.Serialize(output, JsonOutputOptions));
-    }
-
-    /// <summary>
-    /// Write error output in the required JSON format
-    /// </summary>
-    private void WriteErrorOutput(string errorType, string message, List<string> errors)
-    {
-        var output = new
-        {
-            success = false,
-            errorType = errorType,
-            message = message,
-            errors = errors.Where(e => !string.IsNullOrWhiteSpace(e)).ToList()
-        };
-
-        Console.WriteLine(JsonSerializer.Serialize(output, JsonOutputOptions));
-    }
-
-    /// <summary>
-    /// Write output for already submitted invoices (treated as success)
-    /// </summary>
-    private void WriteAlreadySubmittedOutput(EInvoiceResponse response)
-    {
-        var output = new
-        {
-            success = true,
-            alreadySubmitted = true,
-            message = "Invoice was already submitted",
-            result = response
-        };
-
-        Console.WriteLine(JsonSerializer.Serialize(output, JsonOutputOptions));
-    }
-
-    /// <summary>
-    /// Write API error when response contains errors/warnings
-    /// </summary>
-    private void WriteApiErrorOutput(EInvoiceResponse response)
+    internal static CommandResult CreateApiErrorResult(EInvoiceResponse response)
     {
         var errors = new List<string>();
 
@@ -433,6 +377,11 @@ public class InvoiceCommandHandler
             }
         }
 
-        WriteErrorOutput("EInvoiceApiException", "Invoice submission failed", errors);
+        return CommandResult.ErrorResult(
+            ExitCodes.ApiError,
+            "EInvoiceApiException",
+            "Invoice submission failed",
+            errors,
+            response);
     }
 }

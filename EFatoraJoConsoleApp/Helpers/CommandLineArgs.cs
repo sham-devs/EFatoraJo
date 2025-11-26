@@ -13,6 +13,7 @@ public class CommandLineArgs
     public string? Sample { get; set; }
     public bool Help { get; set; }
     public bool Version { get; set; }
+    public bool Verbose { get; set; }
 
     public static CommandLineArgs Parse(string[] args)
     {
@@ -41,6 +42,9 @@ public class CommandLineArgs
                     break;
                 case "--sample":
                     result.Sample = GetNextArg(args, ref i);
+                    break;
+                case "--verbose":
+                    result.Verbose = true;
                     break;
                 case "--help":
                 case "-h":
@@ -121,6 +125,7 @@ Options:
   --secret-key <key>         API secret key (REQUIRED for invoice submission)
   --output-format <format>   Output format: json or text (default: json)
   --sample <type>            Display sample JSON: income, general, special, return
+  --verbose                  Show additional context/header output
   --help, -h, -?             Show this help message
   --version, -v              Show version information
 

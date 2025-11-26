@@ -4,8 +4,8 @@
 
 A command-line application for submitting electronic invoices to the Jordanian e-invoicing system (Jofotara). The application supports sending invoices and return invoices from JSON files with strict validation and machine-readable output.
 
-**Version:** 1.0.1
-**Platform:** .NET 8.0
+**Version:** 1.0.1  
+**Platform:** .NET 8.0  
 **License:** Per project agreement
 
 ## 2. Features
@@ -130,14 +130,14 @@ brew install --cask dotnet-sdk
 # Navigate to application directory
 cd /path/to/EFatoraJo/
 
-# Configure credentials
-dotnet user-secrets set "ClientId" "YOUR_CLIENT_ID_HERE"
-dotnet user-secrets set "SecretKey" "YOUR_SECRET_KEY_HERE"
+# Configure credentials (used by interactive mode)
+dotnet user-secrets set "EFatora:ClientId" "YOUR_CLIENT_ID_HERE"
+dotnet user-secrets set "EFatora:SecretKey" "YOUR_SECRET_KEY_HERE"
 
-# Configure supplier information
-dotnet user-secrets set "Supplier:TaxVATNumber" "1234567890"
-dotnet user-secrets set "Supplier:IncomeSourceSequence" "62010"
-dotnet user-secrets set "Supplier:RegisteredSupplierName" "Your Company Name"
+# Configure supplier information (used by interactive mode)
+dotnet user-secrets set "EFatora:Supplier:TaxNumber" "1234567890"
+dotnet user-secrets set "EFatora:Supplier:ActivityCode" "62010"
+dotnet user-secrets set "EFatora:Supplier:Name" "Your Company Name"
 ```
 
 ### Using Environment Variables (Production Only)
@@ -244,11 +244,15 @@ EFatoraJoConsoleApp --sample return
 | `--return-file <path>` | Path to return invoice JSON file | Yes (or use `--invoice-file`) |
 | `--client-id <id>` | Client ID from Jofotara | Yes |
 | `--secret-key <key>` | Secret Key from Jofotara | Yes |
+| `--output-format <json|text>` | Output format (default: `json`) | No |
+| `--verbose` | Show introductory header in text mode | No |
 
 **Important Rules:**
 - Must use `--invoice-file` **OR** `--return-file` (not both)
 - Must provide `--client-id` and `--secret-key` with every request
 - Credentials are NOT stored in the application for security reasons
+- Default output is JSON; use `--output-format text` for plain text
+- `--verbose` only affects text mode (adds a short header)
 
 ## 7. JSON Structure
 
@@ -302,11 +306,16 @@ The application requires a complete JSON structure that includes all necessary o
 
 ```json
 {
-  "returnInvoiceNumber": "RET-2024-001",
-  "uniqueSerialNumber": "550e8400-e29b-41d4-a716-446655440001",
-  "invoiceDate": "2024-01-15",
-  "paymentType": "LocalIncomeCash",
-  "type": "Income",
+  "originalInvoiceNumber": "INV-2025-001234",
+  "returnInvoiceNumber": "RET-INV-2025-001234",
+  "returnReason": "Customer request / item returned",
+  "returnUUID": "21a105e5-4f52-4bb3-8b8b-38cdbbb6da3c",
+  "uniqueSerialNumber": "c3f2a1b9-7a11-4f5f-a1c2-8e0d9f7c1234",
+  "invoiceDate": "2025-01-15",
+  "paymentType": "SameAsOriginal",
+  "originalPaymentType": "LocalGeneralSalesCash",
+  "originalInvoiceType": "GeneralSales",
+  "type": "SalesReturn",
   "currency": "JOD",
   "supplier": {
     "taxVATNumber": "1234567890",
@@ -317,52 +326,67 @@ The application requires a complete JSON structure that includes all necessary o
     "name": "Customer Name"
   },
   "invoiceTotals": {
-    "totalVATAmount": 0.0,
+    "totalVATAmount": 16.0,
     "totalSpecialTaxAmount": 0.0,
-    "totalBeforeDiscount": -1000.0,
-    "totalInvoiceAmount": -1000.0,
+    "totalBeforeDiscount": 100.0,
+    "totalInvoiceAmount": 116.0,
     "totalDiscountAmount": 0.0,
-    "finalPayableAmount": -1000.0
+    "finalPayableAmount": 116.0
   },
   "invoiceDetails": [
     {
       "id": "LINE-1",
       "taxCategory": "Z",
       "description": "Item Description",
-      "quantity": -1,
-      "unitPriceBeforeTax": 1000.0,
-      "totalBeforeTax": -1000.0,
-      "taxAmount": 0.0,
-      "totalIncludingTax": -1000.0
+      "quantity": 2,
+      "unitPriceBeforeTax": 50.0,
+      "totalBeforeTax": 100.0,
+      "taxAmount": 16.0,
+      "totalIncludingTax": 116.0
     }
-  ],
-  "originalInvoiceNumber": "INV-2024-001",
-  "returnReason": "Customer return"
+  ]
 }
 ```
 
-### Required Fields
+### Required Fields (Sales)
 
 | Field | Type | Description | Valid Values |
 |-------|------|-------------|-------------|
 | `invoiceNumber` | string | Unique invoice number | Any unique string |
 | `uniqueSerialNumber` | string | Unique serial number (UUID preferred) | UUID or unique string |
-| `invoiceDate` | string | Invoice date (yyyy-MM-dd) | Date in yyyy-MM-dd format, not in future |
+| `invoiceDate` | string | Invoice date (yyyy-MM-dd) | Not in the future |
 | `paymentType` | enum | Payment type | `LocalIncomeCash`, `LocalIncomeCredit`, `LocalGeneralSalesCash`, `LocalGeneralSalesCredit`, `LocalSpecialSalesCash`, `LocalSpecialSalesCredit` |
 | `type` | enum | Invoice type | `Income`, `GeneralSales`, `SpecialSales` (default: `GeneralSales`) |
-| `currency` | enum | Currency code | `JOD` (default), other currency codes |
+| `currency` | enum | Currency code | `JOD` (default) |
 | `supplier` | object | Supplier information | See structure below |
 | `customer` | object | Customer information | See structure below |
 | `invoiceTotals` | object | Invoice totals | See structure below |
-| `invoiceDetails` | array | Invoice line items | See structure below, minimum 1 item |
+| `invoiceDetails` | array | Invoice line items | Minimum 1 item |
+
+### Required Fields (Return)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `originalInvoiceNumber` | string | Required; link to the original invoice |
+| `returnInvoiceNumber` | string | Required; must be supplied (no auto-generation) |
+| `returnReason` | string | Required |
+| `uniqueSerialNumber` | string | Required; UUID of the original invoice |
+| `returnUUID` | string | Optional; UUID for the return invoice (auto-generated if omitted) |
+| `invoiceDate` | string | Return invoice date (yyyy-MM-dd) |
+| `type` | literal | Must be `"SalesReturn"` |
+| `paymentType` | string | Either a valid payment enum or the sentinel `"SameAsOriginal"` (requires `originalPaymentType`) |
+| `originalPaymentType` | enum | Required when `paymentType` is `"SameAsOriginal"` |
+| `originalInvoiceType` | enum | Required; type of the original invoice |
+| `invoiceTotals` | object | Totals from the original invoice (positive); converter applies negatives |
+| `invoiceDetails` | array | Line items from the original invoice (positive); converter applies negatives |
 
 ### Customer Identification
 
 For customer identification, use these exact values:
 
-- `"NIN"` for National ID Number ( )
-- `"PN"` for Passport Number (  )
-- `"TN"` for Tax Number ( )
+- `"NIN"` for National ID Number
+- `"PN"` for Passport Number
+- `"TN"` for Tax Number
 
 **Important:** Both `identificationNumber` and `identificationType` are optional, but if you provide `identificationType`, you must also provide `identificationNumber`.
 
@@ -392,9 +416,9 @@ dotnet EFatoraJoConsoleApp.dll
 
 1. **Invoice Type Selection**: Choose from Income, General Sales, or Special Sales invoices
 2. **Automatic Invoice Generation**: Creates sample invoices with random data for testing
-3. **Direct Submission**: Submits invoices directly to the e-invoicing system
-4. **Return Invoice Support**: Optionally creates and submits return invoices
-5. **Real-time Feedback**: Shows success/failure messages with detailed error information
+3. **Guided Submission**: Shows a summary, then asks to submit or skip
+4. **Return Invoice Support**: Optionally creates and submits return invoices after confirmation
+5. **Real-time Feedback**: Uses the same formatter as CLI for success/error output
 
 ### Interactive Mode Workflow
 
@@ -405,8 +429,8 @@ dotnet EFatoraJoConsoleApp.dll
    - 3: Special Sales Invoice (  )
 3. Application generates a random invoice with test data
 4. Review the generated invoice details
-5. Application submits the invoice automatically
-6. Optionally create a return invoice (y/n)
+5. Choose to submit or skip
+6. Optionally create a return invoice (y/n), then submit or skip
 7. Repeat or exit (0)
 
 ### Interactive Mode Configuration
@@ -470,24 +494,31 @@ export EFATORA_SECRET_KEY="xyz789secret"
 
 ## 10. Return Invoices
 
-Return invoices follow a special structure where quantities and amounts are negative:
+Return invoices follow a special structure. The input matches the original invoice (positive values), and the application applies negative signs internally for submission.
 
 ### Key Differences for Return Invoices
 
-1. **Negative Values**: Quantities and totals should be negative
-2. **Return Invoice Number**: Use `returnInvoiceNumber` instead of `invoiceNumber`
-3. **Original Invoice Reference**: Include `originalInvoiceNumber` field
-4. **Return Reason**: Include `returnReason` field
+1. **Input Values Remain Positive**: Provide the original invoice values; the converter negates totals/quantities for you
+2. **Return Invoice Number**: Must be provided (no auto-generation)
+3. **Original Invoice Reference**: `originalInvoiceNumber` is required; UUID link is optional
+4. **Return Reason**: Required
+5. **Payment Type Sentinel**: `paymentType: "SameAsOriginal"` allowed; requires `originalPaymentType`
+6. **Type**: Must be `"SalesReturn"` (literal)
 
 ### Return Invoice Example
 
 ```json
 {
-  "returnInvoiceNumber": "RET-2024-001",
-  "uniqueSerialNumber": "550e8400-e29b-41d4-a716-446655440001",
-  "invoiceDate": "2024-01-15",
-  "paymentType": "LocalIncomeCash",
-  "type": "Income",
+  "originalInvoiceNumber": "INV-2025-001234",
+  "returnInvoiceNumber": "RET-INV-2025-001234",
+  "returnReason": "Customer request / item returned",
+  "returnUUID": "21a105e5-4f52-4bb3-8b8b-38cdbbb6da3c",
+  "uniqueSerialNumber": "c3f2a1b9-7a11-4f5f-a1c2-8e0d9f7c1234",
+  "invoiceDate": "2025-01-15",
+  "paymentType": "SameAsOriginal",
+  "originalPaymentType": "LocalGeneralSalesCash",
+  "originalInvoiceType": "GeneralSales",
+  "type": "SalesReturn",
   "currency": "JOD",
   "supplier": {
     "taxVATNumber": "1234567890",
@@ -498,27 +529,26 @@ Return invoices follow a special structure where quantities and amounts are nega
     "name": "Customer Name"
   },
   "invoiceTotals": {
-    "totalVATAmount": 0.0,
+    "totalVATAmount": 16.0,
     "totalSpecialTaxAmount": 0.0,
-    "totalBeforeDiscount": -1000.0,
-    "totalInvoiceAmount": -1000.0,
+    "totalBeforeDiscount": 100.0,
+    "totalInvoiceAmount": 116.0,
     "totalDiscountAmount": 0.0,
-    "finalPayableAmount": -1000.0
+    "finalPayableAmount": 116.0
   },
   "invoiceDetails": [
     {
       "id": "LINE-1",
       "taxCategory": "Z",
       "description": "Item Description",
-      "quantity": -1,
-      "unitPriceBeforeTax": 1000.0,
-      "totalBeforeTax": -1000.0,
-      "taxAmount": 0.0,
-      "totalIncludingTax": -1000.0
+      "quantity": 2,
+      "unitPriceBeforeTax": 50.0,
+      "totalBeforeTax": 100.0,
+      "taxAmount": 16.0,
+      "totalIncludingTax": 116.0
     }
   ],
-  "originalInvoiceNumber": "INV-2024-001",
-  "returnReason": "Customer return - defective product"
+  "invoiceNote": "Optional note carried from original"
 }
 ```
 
@@ -528,21 +558,19 @@ Return invoices follow a special structure where quantities and amounts are nega
 
 #### Text Mode
 ```
- Invoice submitted successfully
-  Invoice Number: INV-20241122-143052
-  QR Code: iVBORw0KGgoAAAANSUhEUgAA...
+SUCCESS: Invoice submitted successfully
+Invoice Number: INV-20241122-143052
+Invoice UUID: 123e4567-e89b-12d3-a456-426614174000
 ```
 
 #### JSON Mode
 ```json
 {
   "success": true,
-  "result": {
-    "invoiceNumber": "INV-001",
-    "qr": "iVBORw0KGgoAAAANSUhEUgAA...",
-    "einvStatus": "SUBMITTED",
-    "einvNum": "12345"
-  }
+  "message": "Invoice submitted successfully",
+  "exitCode": 0,
+  "alreadySubmitted": null,
+  "result": { ... EInvoiceResponse from SDK ... }
 }
 ```
 
@@ -550,12 +578,10 @@ Return invoices follow a special structure where quantities and amounts are nega
 
 #### Text Mode
 ```
- ERROR: Invoice validation failed
-  Exit Code: 1 (ValidationError)
-
+ERROR (1 - ValidationError): Invoice validation failed
 Details:
-  - InvoiceDate: Invoice date cannot be in the future. Got: 2025-12-31
-  - Customer.TaxNumber: Required for SpecialSales invoices
+- InvoiceDate: Invoice date cannot be in the future. Got: 2025-12-31
+- Customer.TaxNumber: Required for SpecialSales invoices
 ```
 
 #### JSON Mode
@@ -564,6 +590,7 @@ Details:
   "success": false,
   "errorType": "ValidationError",
   "message": "Invoice validation failed",
+  "exitCode": 1,
   "errors": [
     "Customer name is required",
     "Invoice total must be greater than 0"
@@ -1074,6 +1101,8 @@ ENTRYPOINT ["dotnet", "EFatoraJoConsoleApp.dll"]
 - Removed ability to combine invoice and return files in one command
 - Enhanced error handling and output formats
 - Improved security by not storing credentials in application
+- Unified formatter with JSON/text modes and `--output-format`
+- Return invoice input schema: explicit fields (`SalesReturn`, `SameAsOriginal`, required numbers), no auto-generated numbers
 
 ---
 

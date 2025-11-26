@@ -10,7 +10,6 @@ using ShamDevs.EFatoraJo.Models;
 using ShamDevs.EFatoraJo.Models.Responses;
 using System.Text;
 using System.Text.Json;
-using static EFatoraJoConsoleApp.Output.OutputHandler;
 
 namespace EFatoraJoConsoleApp
 {
@@ -33,7 +32,11 @@ namespace EFatoraJoConsoleApp
             }
             catch (Exception ex)
             {
-                OutputHandler.WriteUnexpectedError(OutputFormat.Text, ex);
+                var formatter = new ResultFormatter(OutputFormat.Text);
+                formatter.Write(CommandResult.ErrorResult(
+                    ExitCodes.UnexpectedError,
+                    "UnexpectedError",
+                    ex.Message));
                 return ExitCodes.UnexpectedError;
             }
         }
@@ -41,6 +44,8 @@ namespace EFatoraJoConsoleApp
         static async Task<int> RunCommandLineModeAsync(string[] args)
         {
             var cmdArgs = CommandLineArgs.Parse(args);
+            var format = ResolveOutputFormat(cmdArgs.OutputFormat);
+            var formatter = new ResultFormatter(format);
 
             // Handle --help
             if (cmdArgs.Help)
@@ -67,66 +72,64 @@ namespace EFatoraJoConsoleApp
             string? modeError = cmdArgs.ValidateCommandMode();
             if (modeError != null)
             {
-                WriteJsonError("CommandModeError", modeError);
-                return ExitCodes.ConfigurationError;
+                var modeErrorResult = CommandResult.ErrorResult(
+                    ExitCodes.ConfigurationError,
+                    "CommandModeError",
+                    modeError,
+                    new List<string> { modeError });
+                formatter.Write(modeErrorResult);
+                return modeErrorResult.ExitCode;
             }
 
             // Validate credentials are provided
             var missingCreds = cmdArgs.ValidateCredentials();
             if (missingCreds.Count > 0)
             {
-                WriteJsonError("MissingCredentials",
+                var missingCredsResult = CommandResult.ErrorResult(
+                    ExitCodes.ConfigurationError,
+                    "MissingCredentials",
                     "Required credentials not provided",
                     missingCreds);
-                return ExitCodes.ConfigurationError;
+                formatter.Write(missingCredsResult);
+                return missingCredsResult.ExitCode;
             }
 
             // Create command handler with credentials from command line
             var handler = new InvoiceCommandHandler(cmdArgs.ClientId!, cmdArgs.SecretKey!);
+            CommandResult commandResult;
+
+            if (cmdArgs.Verbose)
+            {
+                formatter.WriteIntro("Command mode");
+            }
 
             // Route to appropriate handler based on command type
             if (!string.IsNullOrWhiteSpace(cmdArgs.InvoiceFile))
             {
-                return await handler.ProcessInvoiceCommand(cmdArgs.InvoiceFile);
+                commandResult = await handler.ProcessInvoiceCommand(cmdArgs.InvoiceFile);
             }
             else if (!string.IsNullOrWhiteSpace(cmdArgs.ReturnFile))
             {
-                return await handler.ProcessReturnInvoiceCommand(cmdArgs.ReturnFile);
+                commandResult = await handler.ProcessReturnInvoiceCommand(cmdArgs.ReturnFile);
+            }
+            else
+            {
+                commandResult = CommandResult.ErrorResult(
+                    ExitCodes.ConfigurationError,
+                    "CommandModeError",
+                    "Either --invoice-file or --return-file must be provided.");
             }
 
-            // Should never reach here due to ValidateCommandMode
-            WriteJsonError("InternalError", "Unexpected code path");
-            return ExitCodes.UnexpectedError;
-        }
-
-        static void WriteJsonError(string errorType, string message, List<string>? errors = null)
-        {
-            var output = new
-            {
-                success = false,
-                errorType = errorType,
-                message = message,
-                errors = errors ?? new List<string>()
-            };
-
-            var options = new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            };
-
-            Console.WriteLine(JsonSerializer.Serialize(output, options));
+            formatter.Write(commandResult);
+            return commandResult.ExitCode;
         }
 
         static async Task<int> RunInteractiveModeAsync()
         {
-            Console.WriteLine("╔════════════════════════════════════════════╗");
-            Console.WriteLine("║   EFatoraJo - Jordan E-Invoice Client      ║");
-            Console.WriteLine("║   Console Test Application                 ║");
-            Console.WriteLine("╚════════════════════════════════════════════╝");
-            Console.WriteLine();
+            var formatter = new ResultFormatter(OutputFormat.Text);
+            Console.WriteLine("EFatoraJo Interactive Mode");
+            Console.WriteLine(new string('-', 40));
 
-            // Load configuration
             var config = new ConfigurationBuilder()
                 .AddUserSecrets<Program>()
                 .Build();
@@ -136,33 +139,39 @@ namespace EFatoraJoConsoleApp
 
             if (string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(secretKey))
             {
-                Console.WriteLine("❌ Error: Missing configuration in User Secrets");
-                Console.WriteLine("Please configure EFatora:ClientId and EFatora:SecretKey");
-                Console.WriteLine("\nTo set user secrets, run:");
-                Console.WriteLine("  dotnet user-secrets set \"EFatora:ClientId\" \"your-client-id\"");
-                Console.WriteLine("  dotnet user-secrets set \"EFatora:SecretKey\" \"your-secret-key\"");
-                return ExitCodes.ConfigurationError;
+                var result = CommandResult.ErrorResult(
+                    ExitCodes.ConfigurationError,
+                    "ConfigurationError",
+                    "Missing configuration in User Secrets",
+                    new List<string>
+                    {
+                        "EFatora:ClientId",
+                        "EFatora:SecretKey"
+                    });
+                formatter.Write(result);
+                return result.ExitCode;
             }
 
-            Console.WriteLine($"✓ Client ID: {clientId}");
-            Console.WriteLine();
+            Console.WriteLine("Credentials found. Press Ctrl+C to exit at any time.");
 
             while (true)
             {
                 try
                 {
-                    // Select invoice type
-                    Console.WriteLine("\n═══════════════════════════════════════════");
+                    Console.WriteLine();
                     Console.WriteLine("Select Invoice Type:");
-                    Console.WriteLine("  1 - Income Invoice (فاتورة دخل)");
-                    Console.WriteLine("  2 - General Sales Invoice (فاتورة مبيعات عامة)");
-                    Console.WriteLine("  3 - Special Sales Invoice (فاتورة مبيعات خاصة)");
+                    Console.WriteLine("  1 - Income Invoice");
+                    Console.WriteLine("  2 - General Sales Invoice");
+                    Console.WriteLine("  3 - Special Sales Invoice");
                     Console.WriteLine("  0 - Exit");
                     Console.Write("\nChoice: ");
 
                     var choice = Console.ReadLine();
 
-                    if (choice == "0") break;
+                    if (choice == "0")
+                    {
+                        break;
+                    }
 
                     InvoiceType invoiceType = choice switch
                     {
@@ -172,33 +181,25 @@ namespace EFatoraJoConsoleApp
                         _ => throw new InvalidOperationException("Invalid choice")
                     };
 
-                    // Generate random invoice
                     var invoice = GenerateRandomInvoice(invoiceType, config);
 
-                    Console.WriteLine("\n📄 Generated Invoice:");
-                    Console.WriteLine($"   Type: {invoiceType}");
-                    Console.WriteLine($"   Number: {invoice.InvoiceNumber}");
-                    Console.WriteLine($"   Date: {invoice.InvoiceDate}");
-                    Console.WriteLine($"   Customer: {invoice.Customer.Name}");
-                    Console.WriteLine($"   Total: {invoice.InvoiceTotals.TotalInvoiceAmount:F2} JOD");
+                    Console.WriteLine("\nGenerated Invoice:");
+                    Console.WriteLine($"  Type: {invoiceType}");
+                    Console.WriteLine($"  Number: {invoice.InvoiceNumber}");
+                    Console.WriteLine($"  Date: {invoice.InvoiceDate}");
+                    Console.WriteLine($"  Customer: {invoice.Customer.Name}");
+                    Console.WriteLine($"  Total: {invoice.InvoiceTotals.TotalInvoiceAmount:F2} JOD");
 
-                    // Submit invoice
-                    Console.WriteLine("\n📤 Submitting invoice...");
-                    var response = await EFatoraJoSdk.SendFatoraAsync(invoice, clientId, secretKey);
-
-                    if (response.IsSuccessfullySubmitted())
+                    Console.Write("\nSubmit invoice now? [Y/n]: ");
+                    var submitChoice = Console.ReadLine();
+                    if (string.IsNullOrWhiteSpace(submitChoice) || submitChoice.Equals("y", StringComparison.OrdinalIgnoreCase))
                     {
-                        Console.WriteLine("\n✅ Invoice submitted successfully!");
-                        Console.WriteLine($"   Invoice Number: {response.InvoiceNumber}");
-                        Console.WriteLine($"   QR Code: {response.Qr}");
-                    }
-                    else
-                    {
-                        HandleFailedResponse(response);
+                        var response = await EFatoraJoSdk.SendFatoraAsync(invoice, clientId, secretKey);
+                        var result = BuildCommandResultFromResponse(response, "Invoice submitted successfully");
+                        formatter.Write(result);
                     }
 
-                    // Ask about return invoice
-                    Console.Write("\n🔄 Create return invoice? (y/n): ");
+                    Console.Write("\nCreate return invoice? [y/N]: ");
                     if (Console.ReadLine()?.ToLower() == "y")
                     {
                         var returnInvoice = new SalesReturnInvoice(
@@ -209,137 +210,64 @@ namespace EFatoraJoConsoleApp
                             returnReason: "Customer return - Interactive mode"
                         );
 
-                        Console.WriteLine("\n📤 Submitting return invoice...");
-                        var returnResponse = await EFatoraJoSdk.SendReturnFatoraAsync(returnInvoice, clientId, secretKey);
-
-                        if (returnResponse.IsSuccessfullySubmitted())
+                        Console.Write("\nSubmit return invoice now? [Y/n]: ");
+                        var submitReturn = Console.ReadLine();
+                        if (string.IsNullOrWhiteSpace(submitReturn) || submitReturn.Equals("y", StringComparison.OrdinalIgnoreCase))
                         {
-                            Console.WriteLine("\n✅ Return invoice submitted successfully!");
-                            Console.WriteLine($"   Return Invoice Number: {returnResponse.InvoiceNumber}");
-                        }
-                        else
-                        {
-                            HandleFailedResponse(returnResponse);
+                            var returnResponse = await EFatoraJoSdk.SendReturnFatoraAsync(returnInvoice, clientId, secretKey);
+                            var result = BuildCommandResultFromResponse(returnResponse, "Return invoice submitted successfully");
+                            formatter.Write(result);
                         }
                     }
                 }
                 catch (InvalidOperationException)
                 {
-                    Console.WriteLine("❌ Invalid choice. Please try again.");
+                    Console.WriteLine("Invalid choice. Please try again.");
                 }
                 catch (InvoiceValidationException ex)
                 {
-                    Console.WriteLine($"\n❌ Validation Error: {ex.Message}");
+                    formatter.Write(CommandResult.ErrorResult(
+                        ExitCodes.ValidationError,
+                        "InvoiceValidationException",
+                        ex.Message,
+                        ex.ValidationErrors?.ToList() ?? new List<string>()));
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"\n❌ Error: {ex.Message}");
+                    formatter.Write(CommandResult.ErrorResult(
+                        ExitCodes.UnexpectedError,
+                        "UnexpectedError",
+                        ex.Message));
                 }
             }
 
-            Console.WriteLine("\n👋 Goodbye!");
+            Console.WriteLine("\nGoodbye!");
             return ExitCodes.Success;
+        }
+
+        static CommandResult BuildCommandResultFromResponse(EInvoiceResponse response, string successMessage)
+        {
+            if (response.IsSuccessfullySubmitted())
+            {
+                return CommandResult.SuccessResult(response, successMessage);
+            }
+
+            if (response.IsAlreadySubmitted())
+            {
+                return CommandResult.SuccessResult(response, "Invoice was already submitted", alreadySubmitted: true);
+            }
+
+            return InvoiceCommandHandler.CreateApiErrorResult(response);
         }
 
         static void ShowSample(string sampleType)
         {
-            var samples = new Dictionary<string, string>
+            try
             {
-                ["income"] = @"{
-  ""invoiceNumber"": ""INV-2024-001"",
-  ""uniqueSerialNumber"": ""550e8400-e29b-41d4-a716-446655440000"",
-  ""invoiceDate"": ""2024-01-15"",
-  ""invoiceType"": ""Income"",
-  ""paymentType"": ""Cash"",
-  ""customer"": {
-    ""name"": ""Ahmad Hassan"",
-    ""taxNumber"": ""1234567890"",
-    ""mobileNumber"": ""962791234567""
-  },
-  ""invoiceLines"": [
-    {
-      ""itemName"": ""Consulting Services"",
-      ""itemQuantity"": 10,
-      ""itemPrice"": 100.00,
-      ""totalAmount"": 1000.00
-    }
-  ],
-  ""totalInvoiceAmount"": 1000.00,
-  ""invoiceNote"": ""Professional consulting services""
-}",
-                ["general"] = @"{
-  ""invoiceNumber"": ""GEN-2024-001"",
-  ""uniqueSerialNumber"": ""550e8400-e29b-41d4-a716-446655440001"",
-  ""invoiceDate"": ""2024-01-15"",
-  ""invoiceType"": ""GeneralSales"",
-  ""paymentType"": ""Cash"",
-  ""customer"": {
-    ""name"": ""Retail Customer"",
-    ""mobileNumber"": ""962791234567""
-  },
-  ""invoiceLines"": [
-    {
-      ""itemName"": ""Product A"",
-      ""itemQuantity"": 5,
-      ""itemPrice"": 20.00,
-      ""taxPercent"": 16.0,
-      ""totalAmount"": 100.00
-    }
-  ],
-  ""totalInvoiceAmount"": 116.00,
-  ""invoiceNote"": ""General sales invoice""
-}",
-                ["special"] = @"{
-  ""invoiceNumber"": ""SPC-2024-001"",
-  ""uniqueSerialNumber"": ""550e8400-e29b-41d4-a716-446655440002"",
-  ""invoiceDate"": ""2024-01-15"",
-  ""invoiceType"": ""SpecialSales"",
-  ""paymentType"": ""Cash"",
-  ""customer"": {
-    ""name"": ""Special Customer"",
-    ""taxNumber"": ""9876543210"",
-    ""mobileNumber"": ""962791234567""
-  },
-  ""invoiceLines"": [
-    {
-      ""itemName"": ""Special Item"",
-      ""itemQuantity"": 3,
-      ""itemPrice"": 150.00,
-      ""taxPercent"": 16.0,
-      ""totalAmount"": 450.00
-    }
-  ],
-  ""totalInvoiceAmount"": 522.00,
-  ""invoiceNote"": ""Special sales invoice""
-}",
-                ["return"] = @"{
-  ""invoiceNumber"": ""RET-2024-001"",
-  ""uniqueSerialNumber"": ""550e8400-e29b-41d4-a716-446655440003"",
-  ""invoiceDate"": ""2024-01-15"",
-  ""invoiceType"": ""Income"",
-  ""paymentType"": ""Cash"",
-  ""customer"": {
-    ""name"": ""Return Customer"",
-    ""mobileNumber"": ""962791234567""
-  },
-  ""invoiceLines"": [
-    {
-      ""itemName"": ""Returned Item"",
-      ""itemQuantity"": 2,
-      ""itemPrice"": 50.00,
-      ""totalAmount"": 100.00
-    }
-  ],
-  ""totalInvoiceAmount"": 100.00,
-  ""invoiceNote"": ""Product return""
-}"
-            };
-
-            if (samples.TryGetValue(sampleType.ToLower(), out var sample))
-            {
-                Console.WriteLine(sample);
+                var sampleJson = EFatoraJoConsoleApp.Samples.SampleProvider.GetSampleJson(sampleType);
+                Console.WriteLine(sampleJson);
             }
-            else
+            catch (ArgumentException)
             {
                 Console.WriteLine($"Unknown sample type: {sampleType}");
                 Console.WriteLine("Available samples: income, general, special, return");
@@ -439,27 +367,18 @@ namespace EFatoraJoConsoleApp
             };
         }
 
-        static void HandleFailedResponse(EInvoiceResponse response)
+        static OutputFormat ResolveOutputFormat(string? value)
         {
-            Console.WriteLine("\n❌ Invoice submission failed!");
-
-            if (response.Results?.Errors != null && response.Results.Errors.Count > 0)
+            if (!string.IsNullOrWhiteSpace(value) &&
+                value.Equals("text", StringComparison.OrdinalIgnoreCase))
             {
-                Console.WriteLine("\nErrors:");
-                foreach (var error in response.Results.Errors)
-                {
-                    Console.WriteLine($"  - {error.Message}");
-                }
+                return OutputFormat.Text;
             }
 
-            if (response.Results?.Warnings != null && response.Results.Warnings.Count > 0)
-            {
-                Console.WriteLine("\nWarnings:");
-                foreach (var warning in response.Results.Warnings)
-                {
-                    Console.WriteLine($"  - {warning.Message}");
-                }
-            }
+            return OutputFormat.Json;
         }
     }
 }
+
+
+

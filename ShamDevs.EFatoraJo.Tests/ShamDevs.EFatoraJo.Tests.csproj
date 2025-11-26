@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ShamDevs.EFatoraJo.Sdk\ShamDevs.EFatoraJo.Sdk.csproj" />
+    <ProjectReference Include="..\EFatoraJoConsoleApp\EFatoraJoConsoleApp.csproj" />
   </ItemGroup>
 
   <ItemGroup>

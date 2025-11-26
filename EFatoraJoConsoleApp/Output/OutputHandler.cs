@@ -15,12 +15,6 @@ public static class OutputHandler
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
-    public enum OutputFormat
-    {
-        Text,
-        Json
-    }
-
     /// <summary>
     /// Write success response
     /// </summary>
