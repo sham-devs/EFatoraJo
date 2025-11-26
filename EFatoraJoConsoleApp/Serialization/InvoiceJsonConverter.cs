@@ -23,7 +23,7 @@ public class InvoiceJsonConverter : JsonConverter<Invoice>
 
             // Extract all required properties with validation
             var invoiceNumber = GetRequiredString(root, "invoiceNumber");
-            var uniqueSerialNumber = GetRequiredString(root, "uniqueSerialNumber");
+            var uniqueSerialNumber = GetRequiredUuid(root, "uniqueSerialNumber");
             var invoiceDate = GetRequiredDate(root, "invoiceDate");
             var paymentType = GetRequiredEnum<InvoicePaymentTypeCode>(root, "paymentType");
             var invoiceType = GetOptionalEnum<InvoiceType>(root, "type") ?? InvoiceType.GeneralSales;
@@ -106,6 +106,20 @@ public class InvoiceJsonConverter : JsonConverter<Invoice>
             throw new JsonException($"Property '{propertyName}' cannot be empty");
         }
 
+        return value;
+    }
+
+    /// <summary>
+    /// Gets a required UUID/GUID property with format validation
+    /// </summary>
+    private static string GetRequiredUuid(JsonElement element, string propertyName)
+    {
+        var value = GetRequiredString(element, propertyName);
+        if (!Guid.TryParse(value, out _))
+        {
+            throw new JsonException(
+                $"Property '{propertyName}' must be a valid UUID/GUID format. Got: {value}");
+        }
         return value;
     }
 
@@ -222,7 +236,7 @@ public class InvoiceJsonConverter : JsonConverter<Invoice>
             customer.PhoneNumber = phone.GetString();
         }
 
-        if (customerElement.TryGetProperty("city", out var city))
+        if (customerElement.TryGetProperty("city", out var city) && city.ValueKind != JsonValueKind.Null)
         {
             customer.City = ParseEnum<CountrySubentityCode>(city, "city");
         }

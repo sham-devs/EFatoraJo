@@ -3,13 +3,9 @@ using EFatoraJoConsoleApp.Helpers;
 using EFatoraJoConsoleApp.Models;
 using EFatoraJoConsoleApp.Output;
 using Microsoft.Extensions.Configuration;
-using ShamDevs.EFatoraJo;
 using ShamDevs.EFatoraJo.Enums;
-using ShamDevs.EFatoraJo.Exceptions;
 using ShamDevs.EFatoraJo.Models;
-using ShamDevs.EFatoraJo.Models.Responses;
 using System.Text;
-using System.Text.Json;
 
 namespace EFatoraJoConsoleApp
 {
@@ -154,6 +150,9 @@ namespace EFatoraJoConsoleApp
 
             Console.WriteLine("Credentials found. Press Ctrl+C to exit at any time.");
 
+            // Create handler for unified error handling
+            var handler = new InvoiceCommandHandler(clientId, secretKey);
+
             while (true)
             {
                 try
@@ -194,8 +193,7 @@ namespace EFatoraJoConsoleApp
                     var submitChoice = Console.ReadLine();
                     if (string.IsNullOrWhiteSpace(submitChoice) || submitChoice.Equals("y", StringComparison.OrdinalIgnoreCase))
                     {
-                        var response = await EFatoraJoSdk.SendFatoraAsync(invoice, clientId, secretKey);
-                        var result = BuildCommandResultFromResponse(response, "Invoice submitted successfully");
+                        var result = await handler.ProcessInvoice(invoice);
                         formatter.Write(result);
                     }
 
@@ -214,8 +212,7 @@ namespace EFatoraJoConsoleApp
                         var submitReturn = Console.ReadLine();
                         if (string.IsNullOrWhiteSpace(submitReturn) || submitReturn.Equals("y", StringComparison.OrdinalIgnoreCase))
                         {
-                            var returnResponse = await EFatoraJoSdk.SendReturnFatoraAsync(returnInvoice, clientId, secretKey);
-                            var result = BuildCommandResultFromResponse(returnResponse, "Return invoice submitted successfully");
+                            var result = await handler.ProcessReturnInvoice(returnInvoice);
                             formatter.Write(result);
                         }
                     }
@@ -223,14 +220,6 @@ namespace EFatoraJoConsoleApp
                 catch (InvalidOperationException)
                 {
                     Console.WriteLine("Invalid choice. Please try again.");
-                }
-                catch (InvoiceValidationException ex)
-                {
-                    formatter.Write(CommandResult.ErrorResult(
-                        ExitCodes.ValidationError,
-                        "InvoiceValidationException",
-                        ex.Message,
-                        ex.ValidationErrors?.ToList() ?? new List<string>()));
                 }
                 catch (Exception ex)
                 {
@@ -243,21 +232,6 @@ namespace EFatoraJoConsoleApp
 
             Console.WriteLine("\nGoodbye!");
             return ExitCodes.Success;
-        }
-
-        static CommandResult BuildCommandResultFromResponse(EInvoiceResponse response, string successMessage)
-        {
-            if (response.IsSuccessfullySubmitted())
-            {
-                return CommandResult.SuccessResult(response, successMessage);
-            }
-
-            if (response.IsAlreadySubmitted())
-            {
-                return CommandResult.SuccessResult(response, "Invoice was already submitted", alreadySubmitted: true);
-            }
-
-            return InvoiceCommandHandler.CreateApiErrorResult(response);
         }
 
         static void ShowSample(string sampleType)

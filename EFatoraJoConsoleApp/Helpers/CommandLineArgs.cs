@@ -61,12 +61,28 @@ public class CommandLineArgs
         return result;
     }
 
+    /// <summary>
+    /// Gets the next argument value, handling edge cases like filenames starting with "--"
+    /// </summary>
     private static string? GetNextArg(string[] args, ref int currentIndex)
     {
-        if (currentIndex + 1 < args.Length && !args[currentIndex + 1].StartsWith("--"))
+        if (currentIndex + 1 < args.Length)
         {
-            currentIndex++;
-            return args[currentIndex];
+            var nextArg = args[currentIndex + 1];
+
+            // Allow values that start with -- if they look like file paths
+            // (contain a dot for extension, or start with ./ or ../ for relative paths)
+            bool isLikelyFilePath = nextArg.Contains('.') ||
+                                    nextArg.StartsWith("./") ||
+                                    nextArg.StartsWith("../") ||
+                                    nextArg.StartsWith(".\\") ||
+                                    nextArg.StartsWith("..\\");
+
+            if (!nextArg.StartsWith("--") || isLikelyFilePath)
+            {
+                currentIndex++;
+                return nextArg;
+            }
         }
         return null;
     }

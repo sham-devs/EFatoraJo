@@ -62,7 +62,7 @@ public static class ReturnInvoiceJsonParser
     private static Invoice BuildOriginalInvoice(JsonElement root)
     {
         var originalInvoiceNumber = GetRequiredString(root, "originalInvoiceNumber");
-        var uniqueSerialNumber = GetRequiredString(root, "uniqueSerialNumber");
+        var uniqueSerialNumber = GetRequiredUuid(root, "uniqueSerialNumber");
         var invoiceDate = GetRequiredDate(root, "invoiceDate");
         var paymentType = ResolvePaymentType(root);
         var invoiceType = ResolveInvoiceType(root);
@@ -107,6 +107,18 @@ public static class ReturnInvoiceJsonParser
         return invoice;
     }
 
+    /// <summary>
+    /// Applies negative signs to totals and details for return invoice semantics.
+    /// WARNING: This method modifies the objects in-place. The objects should be
+    /// freshly created and not shared with other code.
+    /// </summary>
+    /// <remarks>
+    /// Input values are expected to be positive (from original invoice).
+    /// The Negate function only negates positive values, leaving zero or
+    /// negative values unchanged as a safety measure.
+    /// </remarks>
+    /// <param name="totals">Invoice totals to negate (modified in-place)</param>
+    /// <param name="details">Invoice line items to negate (modified in-place)</param>
     private static void ApplyReturnSigns(InvoiceTotals totals, List<InvoiceDetail> details)
     {
         totals.TotalVATAmount = Negate(totals.TotalVATAmount);
@@ -137,6 +149,7 @@ public static class ReturnInvoiceJsonParser
     }
 
     private static decimal Negate(decimal value) => value > 0 ? -value : value;
+    private static int Negate(int value) => value > 0 ? -value : value;
 
     private static InvoicePaymentTypeCode ResolvePaymentType(JsonElement root)
     {
@@ -198,11 +211,6 @@ public static class ReturnInvoiceJsonParser
 
         var supplier = new Supplier(taxVATNumber, incomeSourceSequence, registeredSupplierName);
 
-        if (supplierElement.TryGetProperty("branchCode", out var branchElement) && branchElement.ValueKind == JsonValueKind.String)
-        {
-            supplier.BranchCode = branchElement.GetString();
-        }
-
         return supplier;
     }
 
@@ -237,7 +245,7 @@ public static class ReturnInvoiceJsonParser
             customer.PhoneNumber = phone.GetString();
         }
 
-        if (customerElement.TryGetProperty("city", out var city))
+        if (customerElement.TryGetProperty("city", out var city) && city.ValueKind != JsonValueKind.Null)
         {
             customer.City = ParseEnum<CountrySubentityCode>(city, "city");
         }
@@ -283,12 +291,12 @@ public static class ReturnInvoiceJsonParser
             try
             {
                 var id = GetRequiredString(itemElement, "id");
-                var taxCategory = ParseEnum<TaxCategoryCode>(itemElement, "taxCategory");
+                var taxCategory = GetRequiredEnum<TaxCategoryCode>(itemElement, "taxCategory");
                 var description = GetRequiredString(itemElement, "description");
 
                 var detail = new InvoiceDetail(id, taxCategory, description)
                 {
-                    Quantity = GetRequiredDecimal(itemElement, "quantity"),
+                    Quantity = GetRequiredInt(itemElement, "quantity"),
                     UnitPriceBeforeTax = GetRequiredDecimal(itemElement, "unitPriceBeforeTax"),
                     TotalBeforeTax = GetRequiredDecimal(itemElement, "totalBeforeTax"),
                     TaxAmount = GetRequiredDecimal(itemElement, "taxAmount"),
@@ -365,6 +373,20 @@ public static class ReturnInvoiceJsonParser
         return string.IsNullOrWhiteSpace(value) ? null : value;
     }
 
+    /// <summary>
+    /// Gets a required UUID/GUID property with format validation
+    /// </summary>
+    private static string GetRequiredUuid(JsonElement element, string propertyName)
+    {
+        var value = GetRequiredString(element, propertyName);
+        if (!Guid.TryParse(value, out _))
+        {
+            throw new JsonException(
+                $"Property '{propertyName}' must be a valid UUID/GUID format. Got: {value}");
+        }
+        return value;
+    }
+
     private static string GetRequiredDate(JsonElement element, string propertyName)
     {
         var dateStr = GetRequiredString(element, propertyName);
@@ -396,6 +418,37 @@ public static class ReturnInvoiceJsonParser
         }
 
         return prop.GetDecimal();
+    }
+
+    private static int GetRequiredInt(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var prop))
+        {
+            throw new JsonException($"Required property '{propertyName}' is missing");
+        }
+
+        if (prop.ValueKind != JsonValueKind.Number)
+        {
+            throw new JsonException($"Property '{propertyName}' must be a number");
+        }
+
+        var value = prop.GetInt32();
+        if (value <= 0 && propertyName == "quantity")
+        {
+            throw new JsonException($"Property '{propertyName}' must be greater than 0");
+        }
+
+        return value;
+    }
+
+    private static TEnum GetRequiredEnum<TEnum>(JsonElement element, string propertyName) where TEnum : struct, Enum
+    {
+        if (!element.TryGetProperty(propertyName, out var prop))
+        {
+            throw new JsonException($"Required property '{propertyName}' is missing");
+        }
+
+        return ParseEnum<TEnum>(prop, propertyName);
     }
 
     private static TEnum ParseEnum<TEnum>(JsonElement element, string propertyName) where TEnum : struct, Enum

@@ -53,7 +53,7 @@ public class ResultFormatter
             errorType = result.ErrorType,
             errors = result.Errors,
             exitCode = result.ExitCode,
-            alreadySubmitted = result.AlreadySubmitted ? true : null,
+            alreadySubmitted = result.AlreadySubmitted ? true : (bool?)null,
             result = result.Result
         };
 
