@@ -7,16 +7,37 @@ using System.Text.Json;
 namespace EFatoraJoConsoleApp.Serialization;
 
 /// <summary>
-/// Parses and validates return invoice input according to the explicit schema.
+/// Parses and validates return invoice JSON input according to the explicit schema.
+/// This parser is isolated from <see cref="InvoiceJsonParser"/> and handles only return invoice files.
 /// </summary>
+/// <remarks>
+/// <para>Key differences from regular invoice parsing:</para>
+/// <list type="bullet">
+///   <item><description>Requires 'originalInvoiceNumber', 'returnInvoiceNumber', and 'returnReason' fields</description></item>
+///   <item><description>Requires 'type' to be 'SalesReturn'</description></item>
+///   <item><description>Automatically negates all monetary amounts and quantities for return semantics</description></item>
+/// </list>
+/// <para>This parser uses defensive copying to ensure parsed objects are not shared or modified unexpectedly.</para>
+/// </remarks>
 public static class ReturnInvoiceJsonParser
 {
     private const string SalesReturnLiteral = "SalesReturn";
     private const string PaymentTypeSentinel = "SameAsOriginal";
 
     /// <summary>
-    /// Parse return invoice input JSON into a validated DTO.
+    /// Parse return invoice input JSON into a validated DTO with negated amounts.
     /// </summary>
+    /// <param name="json">JSON string containing return invoice data</param>
+    /// <returns>Validated <see cref="ReturnInvoiceInput"/> with negated monetary amounts</returns>
+    /// <exception cref="JsonException">
+    /// Thrown when:
+    /// <list type="bullet">
+    ///   <item><description>JSON is empty or malformed</description></item>
+    ///   <item><description>Required fields are missing (originalInvoiceNumber, returnInvoiceNumber, returnReason, type)</description></item>
+    ///   <item><description>Type is not 'SalesReturn'</description></item>
+    ///   <item><description>A regular invoice file is used instead of return invoice file</description></item>
+    /// </list>
+    /// </exception>
     public static ReturnInvoiceInput Parse(string json)
     {
         if (string.IsNullOrWhiteSpace(json))
@@ -31,6 +52,9 @@ public static class ReturnInvoiceJsonParser
         });
 
         var root = doc.RootElement;
+
+        // Detect common mistakes early for better error messages
+        DetectCommonMistakes(root);
 
         var originalInvoiceNumber = GetRequiredString(root, "originalInvoiceNumber");
         var returnInvoiceNumber = GetRequiredString(root, "returnInvoiceNumber");
@@ -84,8 +108,21 @@ public static class ReturnInvoiceJsonParser
             invoiceDetails: invoiceDetails,
             type: invoiceType);
 
-        // Convert amounts to negatives for return semantics
-        ApplyReturnSigns(invoice.InvoiceTotals, invoice.InvoiceDetails);
+        // Convert amounts to negatives for return semantics using defensive copies
+        var negatedTotals = CreateNegatedTotals(invoice.InvoiceTotals);
+        var negatedDetails = CreateNegatedDetails(invoice.InvoiceDetails);
+
+        // Create new invoice with negated values
+        invoice = new Invoice(
+            invoiceNumber: invoice.InvoiceNumber,
+            uniqueSerialNumber: invoice.UniqueSerialNumber,
+            invoiceDate: invoice.InvoiceDate,
+            paymentType: invoice.PaymentType,
+            supplier: invoice.Supplier,
+            customer: invoice.Customer,
+            invoiceTotals: negatedTotals,
+            invoiceDetails: negatedDetails,
+            type: invoice.Type);
 
         if (root.TryGetProperty("currency", out var currencyElement) && currencyElement.ValueKind == JsonValueKind.String)
         {
@@ -108,48 +145,103 @@ public static class ReturnInvoiceJsonParser
     }
 
     /// <summary>
-    /// Applies negative signs to totals and details for return invoice semantics.
-    /// WARNING: This method modifies the objects in-place. The objects should be
-    /// freshly created and not shared with other code.
+    /// Creates a new InvoiceTotals with negated values for return invoice semantics.
+    /// Uses defensive copying to ensure the original object is not modified.
     /// </summary>
-    /// <remarks>
-    /// Input values are expected to be positive (from original invoice).
-    /// The Negate function only negates positive values, leaving zero or
-    /// negative values unchanged as a safety measure.
-    /// </remarks>
-    /// <param name="totals">Invoice totals to negate (modified in-place)</param>
-    /// <param name="details">Invoice line items to negate (modified in-place)</param>
-    private static void ApplyReturnSigns(InvoiceTotals totals, List<InvoiceDetail> details)
+    /// <param name="totals">Original invoice totals (not modified)</param>
+    /// <returns>New InvoiceTotals with negated values</returns>
+    private static InvoiceTotals CreateNegatedTotals(InvoiceTotals totals)
     {
-        totals.TotalVATAmount = Negate(totals.TotalVATAmount);
-        totals.TotalSpecialTaxAmount = Negate(totals.TotalSpecialTaxAmount);
-        totals.TotalBeforeDiscount = Negate(totals.TotalBeforeDiscount);
-        totals.TotalInvoiceAmount = Negate(totals.TotalInvoiceAmount);
-        totals.TotalDiscountAmount = Negate(totals.TotalDiscountAmount);
-        totals.FinalPayableAmount = Negate(totals.FinalPayableAmount);
+        return new InvoiceTotals
+        {
+            TotalVATAmount = Negate(totals.TotalVATAmount),
+            TotalSpecialTaxAmount = Negate(totals.TotalSpecialTaxAmount),
+            TotalBeforeDiscount = Negate(totals.TotalBeforeDiscount),
+            TotalInvoiceAmount = Negate(totals.TotalInvoiceAmount),
+            TotalDiscountAmount = Negate(totals.TotalDiscountAmount),
+            FinalPayableAmount = Negate(totals.FinalPayableAmount)
+        };
+    }
+
+    /// <summary>
+    /// Creates a new list of InvoiceDetails with negated values for return invoice semantics.
+    /// Uses defensive copying to ensure the original objects are not modified.
+    /// </summary>
+    /// <param name="details">Original invoice details (not modified)</param>
+    /// <returns>New list of InvoiceDetails with negated values</returns>
+    private static List<InvoiceDetail> CreateNegatedDetails(List<InvoiceDetail> details)
+    {
+        var negatedDetails = new List<InvoiceDetail>(details.Count);
 
         foreach (var detail in details)
         {
-            detail.Quantity = Negate(detail.Quantity);
-            detail.UnitPriceBeforeTax = Negate(detail.UnitPriceBeforeTax);
-            detail.TotalBeforeTax = Negate(detail.TotalBeforeTax);
-            detail.TaxAmount = Negate(detail.TaxAmount);
-            detail.TotalIncludingTax = Negate(detail.TotalIncludingTax);
-
-            if (detail.SpecialTaxAmount.HasValue)
+            var negatedDetail = new InvoiceDetail(detail.ID, detail.TaxCategory, detail.Description)
             {
-                detail.SpecialTaxAmount = Negate(detail.SpecialTaxAmount.Value);
-            }
+                Quantity = Negate(detail.Quantity),
+                UnitPriceBeforeTax = Negate(detail.UnitPriceBeforeTax),
+                TotalBeforeTax = Negate(detail.TotalBeforeTax),
+                TaxAmount = Negate(detail.TaxAmount),
+                TotalIncludingTax = Negate(detail.TotalIncludingTax),
+                SpecialTaxAmount = detail.SpecialTaxAmount.HasValue ? Negate(detail.SpecialTaxAmount.Value) : null,
+                DiscountAmount = detail.DiscountAmount.HasValue ? Negate(detail.DiscountAmount.Value) : null
+            };
 
-            if (detail.DiscountAmount.HasValue)
-            {
-                detail.DiscountAmount = Negate(detail.DiscountAmount.Value);
-            }
+            negatedDetails.Add(negatedDetail);
         }
+
+        return negatedDetails;
     }
 
     private static decimal Negate(decimal value) => value > 0 ? -value : value;
     private static int Negate(int value) => value > 0 ? -value : value;
+
+    /// <summary>
+    /// Detects common mistakes in return invoice JSON structure and provides helpful error messages.
+    /// </summary>
+    private static void DetectCommonMistakes(JsonElement root)
+    {
+        // Case 1: Has nested returnedInvoice structure (old SDK format) - check first as it's most specific
+        if (root.TryGetProperty("returnedInvoice", out _))
+        {
+            throw new JsonException(
+                "This file uses the old nested 'returnedInvoice' structure which is not supported. " +
+                "Return invoice files should use a flat structure with 'originalInvoiceNumber', " +
+                "'returnInvoiceNumber', 'returnReason', and invoice data at the root level. " +
+                "See sample with: --sample return");
+        }
+
+        // Check if this looks like a regular invoice file being used as return invoice
+        // Regular invoices have invoiceNumber but not originalInvoiceNumber
+        bool hasInvoiceNumber = root.TryGetProperty("invoiceNumber", out _);
+        bool hasOriginalInvoiceNumber = root.TryGetProperty("originalInvoiceNumber", out _);
+        bool hasReturnReason = root.TryGetProperty("returnReason", out _);
+        bool hasType = root.TryGetProperty("type", out var typeElement);
+
+        // Case 2: Has invoiceNumber but missing return-specific fields
+        if (hasInvoiceNumber && !hasOriginalInvoiceNumber && !hasReturnReason)
+        {
+            throw new JsonException(
+                "This file appears to be a regular invoice, not a return invoice. " +
+                "Return invoice files require 'originalInvoiceNumber', 'returnInvoiceNumber', " +
+                "'returnReason', and 'type' set to 'SalesReturn'. " +
+                "Use --invoice-file for regular invoices or convert to return invoice format.");
+        }
+
+        // Case 3: Has type but it's not SalesReturn (provide clearer message)
+        if (hasType && typeElement.ValueKind == JsonValueKind.String)
+        {
+            var typeValue = typeElement.GetString();
+            if (!string.IsNullOrEmpty(typeValue) &&
+                !typeValue.Equals(SalesReturnLiteral, StringComparison.OrdinalIgnoreCase) &&
+                !hasReturnReason)
+            {
+                throw new JsonException(
+                    $"This file has 'type' set to '{typeValue}' but appears to be used as a return invoice. " +
+                    "Return invoices must have 'type' set to 'SalesReturn'. " +
+                    "If this is a regular invoice, use --invoice-file instead of --return-file.");
+            }
+        }
+    }
 
     private static InvoicePaymentTypeCode ResolvePaymentType(JsonElement root)
     {

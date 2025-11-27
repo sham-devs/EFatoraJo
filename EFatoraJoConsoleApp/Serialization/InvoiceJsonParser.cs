@@ -4,8 +4,19 @@ using System.Text.Json;
 namespace EFatoraJoConsoleApp.Serialization;
 
 /// <summary>
-/// Parser for Invoice JSON with strict validation
+/// Parser for regular invoice JSON with strict validation.
+/// This parser is isolated from <see cref="ReturnInvoiceJsonParser"/> and handles only regular invoice files.
 /// </summary>
+/// <remarks>
+/// <para>This parser validates and rejects return invoice files to ensure path isolation.</para>
+/// <para>Key validation rules:</para>
+/// <list type="bullet">
+///   <item><description>Rejects files containing 'returnReason' or 'returnedInvoice' properties</description></item>
+///   <item><description>Requires standard invoice fields: invoiceNumber, uniqueSerialNumber, invoiceDate, paymentType</description></item>
+///   <item><description>All monetary amounts remain positive (no sign conversion)</description></item>
+/// </list>
+/// </remarks>
+/// <seealso cref="ReturnInvoiceJsonParser"/>
 public static class InvoiceJsonParser
 {
     private static readonly JsonSerializerOptions Options = new()
@@ -17,8 +28,18 @@ public static class InvoiceJsonParser
     };
 
     /// <summary>
-    /// Parse Invoice from JSON string
+    /// Parse a regular invoice from JSON string with strict validation.
     /// </summary>
+    /// <param name="json">JSON string containing invoice data</param>
+    /// <returns>Validated <see cref="Invoice"/> with all positive amounts</returns>
+    /// <exception cref="JsonException">
+    /// Thrown when:
+    /// <list type="bullet">
+    ///   <item><description>JSON is empty or malformed</description></item>
+    ///   <item><description>Required fields are missing</description></item>
+    ///   <item><description>A return invoice file is used (contains returnReason or returnedInvoice)</description></item>
+    /// </list>
+    /// </exception>
     public static Invoice ParseInvoice(string json)
     {
         if (string.IsNullOrWhiteSpace(json))
